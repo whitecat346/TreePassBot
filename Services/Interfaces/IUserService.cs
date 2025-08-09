@@ -1,0 +1,11 @@
+using TreePassBot.Data.Entities;
+
+namespace TreePassBot.Services.Interfaces;
+
+public interface IUserService
+{
+    Task<bool> AddPendingUserAsync(ulong qqId);
+    Task<PendingUser?> GetPendingUserAsync(ulong qqId);
+    Task<bool> UpdateUserStatusAsync(ulong qqId, AuditStatus status, string? passcode = null);
+    Task<bool> ValidateJoinRequestAsync(ulong qqId, string passcode);
+}

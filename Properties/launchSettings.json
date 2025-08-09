@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "TreePassBot": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}
