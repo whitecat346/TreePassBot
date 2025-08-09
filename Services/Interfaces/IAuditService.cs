@@ -1,13 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
 namespace TreePassBot.Services.Interfaces;
 
 public interface IAuditService
 {
-    Task ProcessApprovalAsync(ulong targetQqId, ulong operatorQqId);
+    Task<bool> ProcessApprovalAsync(ulong targetQqId, ulong operatorQqId, ulong groupId);
     Task ProcessDenialAsync(ulong targetQqId, ulong operatorQqId);
 }

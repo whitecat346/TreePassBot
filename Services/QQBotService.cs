@@ -5,15 +5,16 @@ using TreePassBot.Handlers;
 
 namespace TreePassBot.Services;
 
-public class QQBotService : IHostedService
+public class QqBotService : IHostedService
 {
-    private static readonly MakabakaApp _app = new MakabakaAppBuilder().Build();
+    public static readonly MakabakaApp MakabakaApp = new MakabakaAppBuilder(Program.InArgs).Build();
 
-    public static async Task Init(CancellationToken ct)
+    private static async Task Init(CancellationToken ct)
     {
-        _app.BotContext.OnGroupAddRequest += OnGroupAddRequest;
+        MakabakaApp.BotContext.OnGroupAddRequest += OnGroupAddRequest;
+        MakabakaApp.BotContext.OnGroupMessage += OnGroupMessageHandlerMethod;
 
-        await _app.StartAsync(ct);
+        await MakabakaApp.StartAsync(ct);
     }
 
 
@@ -22,8 +23,14 @@ public class QQBotService : IHostedService
     private static Task OnGroupAddRequest(object sender, GroupAddRequestEventArgs e)
     {
         var handler = (GroupRequestEventHandler)Program.AppHost.Services.GetService(typeof(GroupRequestEventHandler))!;
-        handler.HandleAddRequest(sender, e);
-        return Task.CompletedTask;
+        return handler.HandleAddRequest(sender, e);
+    }
+
+    private static Task OnGroupMessageHandlerMethod(object sender, GroupMessageEventArgs e)
+    {
+        var handler =
+            (GroupMessageEventHandler)Program.AppHost.Services.GetService(typeof(GroupMessageEventHandler))!;
+        return handler.HandleGroupMessage(sender, e);
     }
 
     #endregion
@@ -37,6 +44,6 @@ public class QQBotService : IHostedService
     /// <inheritdoc />
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        await _app.StopAsync(cancellationToken);
+        await MakabakaApp.StopAsync(cancellationToken);
     }
 }

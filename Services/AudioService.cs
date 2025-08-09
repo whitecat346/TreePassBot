@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Makabaka.Messages;
 using Microsoft.Extensions.Logging;
 using TreePassBot.Data;
 using TreePassBot.Data.Entities;
@@ -17,35 +13,45 @@ public class AudioService(
     ILogger<AudioService> logger) : IAuditService
 {
     /// <inheritdoc />
-    public async Task ProcessApprovalAsync(ulong targetQqId, ulong operatorQqId)
+    public async Task<bool> ProcessApprovalAsync(ulong targetQqId, ulong operatorQqId, ulong groupId)
     {
         var user = await userService.GetPendingUserAsync(targetQqId);
         if (user is not { Status: AuditStatus.Pending })
         {
             logger.LogError($"Targe user: {user} not contains in pending list.");
-            return;
+
+            await messageService.SendGroupMessageAsync(groupId,
+                [new AtSegment(operatorQqId), new TextSegment("目标QQ号未找到！")]);
+
+            return false;
         }
 
         var passcode = await GenerateUniquePasscodeAsync();
-        
+
         // update data
         var success = await userService.UpdateUserStatusAsync(targetQqId, AuditStatus.Approved, passcode);
 
         if (success)
         {
-            // TODO: impl message service
-                targetQqId,
-                $"您的审核已通过！请使用以下验证码登录：{passcode}");
+            await messageService.SendPrivateMessageAsync(targetQqId,
+                [new TextSegment($"您的审核已通过！请在入群申请中填写以下验证码：{passcode}")]);
         }
+
+        logger.LogInformation($"User {targetQqId} has been approved by operator {operatorQqId}.");
+
+        return true;
     }
 
     /// <inheritdoc />
-    public Task ProcessDenialAsync(ulong targetQqId, ulong operatorQqId)
+    public async Task ProcessDenialAsync(ulong targetQqId, ulong operatorQqId)
     {
-        return null;
+        await messageService.SendPrivateMessageAsync(targetQqId,
+            [new TextSegment("很抱歉，您的审核未通过！")]);
+
+        logger.LogInformation($"User {targetQqId} has been denied approval by operator {operatorQqId}.");
     }
 
-    private async Task<string> GenerateUniquePasscodeAsync()
+    private Task<string> GenerateUniquePasscodeAsync()
     {
         // 循环生成直到找到一个唯一的
         while (true)
@@ -56,14 +62,8 @@ public class AudioService(
 
             if (!dataStore.PasscodeExists(passcode))
             {
-                return passcode;
+                return Task.FromResult(passcode);
             }
         }
-    }
-
-    /// <inheritdoc />
-    public Task ProcessDenialAsync(long targetQqId, ulong operatorQqId)
-    {
-        return null;
     }
 }

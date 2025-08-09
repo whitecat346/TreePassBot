@@ -1,11 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
 namespace TreePassBot.Services.Interfaces;
 
 public interface IMessageService
 {
+    public Task SendGroupMessageAsync(ulong groupId, Makabaka.Messages.Message msg);
+    public Task SendPrivateMessageAsync(ulong userId, Makabaka.Messages.Message msg);
 }

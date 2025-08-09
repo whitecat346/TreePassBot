@@ -1,9 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using TreePassBot.Data.Entities;
 using TreePassBot.Models;
@@ -13,43 +8,43 @@ namespace TreePassBot.Data;
 public class JsonDataStore
 {
     private readonly string _filePath;
-    private AppData _data;
-    private static readonly object _lock = new();
+    private readonly PendingUserData _data;
+    private static readonly object Lock = new();
 
     public JsonDataStore(IOptions<BotConfig> config)
     {
         _filePath = config.Value.DataFile;
-        LoadData();
+        _data = LoadData();
     }
 
-    private void LoadData()
+    private PendingUserData LoadData()
     {
-        lock (_lock)
+        lock (Lock)
         {
             if (!File.Exists(_filePath))
             {
-                _data = new AppData();
-                return;
+                return new PendingUserData();
             }
 
             var json = File.ReadAllText(_filePath);
-            _data = JsonSerializer.Deserialize<AppData>(json) ?? new AppData();
+            return JsonSerializer.Deserialize(
+                       json, typeof(PendingUserData), PendingUserDataContext.Default) as PendingUserData
+                   ?? new PendingUserData();
         }
     }
 
     private void SaveChange()
     {
-        lock (_lock)
+        lock (Lock)
         {
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            var json = JsonSerializer.Serialize(_data, options);
+            var json = JsonSerializer.Serialize(_data, typeof(PendingUserData), PendingUserDataContext.Default);
             File.WriteAllText(_filePath, json);
         }
     }
 
     public PendingUser? GetUserByQqId(ulong qqId)
     {
-        lock (_lock)
+        lock (Lock)
         {
             return _data.Users.FirstOrDefault(u => u.QqId == qqId);
         }
@@ -57,7 +52,7 @@ public class JsonDataStore
 
     public bool UserExists(ulong qqId)
     {
-        lock (_lock)
+        lock (Lock)
         {
             return _data.Users.Any(u => u.QqId == qqId);
         }
@@ -65,7 +60,7 @@ public class JsonDataStore
 
     public bool PasscodeExists(string passcode)
     {
-        lock (_lock)
+        lock (Lock)
         {
             return _data.Users.Any(u => u.Passcode.Equals(passcode, StringComparison.OrdinalIgnoreCase));
         }
@@ -73,7 +68,7 @@ public class JsonDataStore
 
     public void AddUser(PendingUser user)
     {
-        lock (_lock)
+        lock (Lock)
         {
             if (_data.Users.Any(u => u.QqId == user.QqId))
             {
@@ -87,7 +82,7 @@ public class JsonDataStore
 
     public void UpdateUser(PendingUser user)
     {
-        lock (_lock)
+        lock (Lock)
         {
             var existingUser = _data.Users.FirstOrDefault(u => u.QqId == user.QqId);
             if (existingUser == null)

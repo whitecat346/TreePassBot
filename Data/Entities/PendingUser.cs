@@ -15,5 +15,5 @@ public class PendingUser
     public string Passcode { get; set; } = string.Empty;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime? UpdatedAt { get; set; } = null;
+    public DateTime? UpdatedAt { get; set; }
 }
