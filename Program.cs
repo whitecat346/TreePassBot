@@ -35,8 +35,7 @@ internal class Program
                     .Enrich.FromLogContext())
                 .ConfigureServices(((hostContext, services) =>
                 {
-                    // 移除或注释掉这一行以避免IL2026/IL3050警告
-                    // services.Configure<BotConfig>(hostContext.Configuration.GetSection("BotConfig"));
+                    services.Configure<BotConfig>(hostContext.Configuration.GetSection("BotConfig"));
 
                     services.AddSingleton<JsonDataStore>();
 
@@ -46,12 +45,6 @@ internal class Program
 
                     services.AddSingleton<GroupMessageEventHandler>();
                     services.AddSingleton<GroupRequestEventHandler>();
-
-                    // 手动绑定配置，避免使用 Get<T>() 以消除 IL2026/IL3050 警告
-                    var botConfigSection = hostContext.Configuration.GetSection("BotConfig");
-                    var botConfig = new BotConfig();
-                    botConfigSection.Bind(botConfig);
-                    services.AddSingleton(botConfig);
 
                     services.AddHostedService<QqBotService>();
                 }))
@@ -63,7 +56,7 @@ internal class Program
         }
         catch (Exception ex)
         {
-            Log.Fatal(ex, "Hot rerminated unexpectedly.");
+            Log.Fatal(ex, "Host rerminated unexpectedly.");
             throw;
         }
     }

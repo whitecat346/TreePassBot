@@ -38,21 +38,13 @@ public class UserService(
     }
 
     /// <inheritdoc />
-    public Task<bool> UpdateUserStatusAsync(ulong qqId, AuditStatus status, string? passcode = null)
+    public Task<bool> UpdateUserStatusAsync(ulong qqId, AuditStatus status, string passcode)
     {
         var user = dataStore.GetUserByQqId(qqId);
         if (user == null) return Task.FromResult(false);
 
-        // 如果生成了验证码，需要确保验证码是唯一的
-        if (passcode != null && dataStore.PasscodeExists(passcode))
-        {
-            logger.LogError("Generated passcode {Passcode} already exists. This should be rare.", passcode);
-            // 这里可以加入重试逻辑
-            return Task.FromResult(false);
-        }
-
         user.Status = status;
-        user.Passcode = passcode ?? string.Empty;
+        user.Passcode = passcode;
         user.UpdatedAt = DateTime.UtcNow;
 
         dataStore.UpdateUser(user);
@@ -65,14 +57,24 @@ public class UserService(
         var user = dataStore.GetUserByQqId(qqId);
         if (user == null)
         {
-            return Task.FromResult(false);
+            throw new ArgumentNullException(nameof(user), "User not found in data store.");
         }
 
         if (user.Passcode.Equals(passcode, StringComparison.OrdinalIgnoreCase))
         {
+            user.Status = AuditStatus.Approved;
+            dataStore.UpdateUser(user);
             return Task.FromResult(true);
         }
 
         return Task.FromResult(false);
+    }
+
+    /// <inheritdoc />
+    public Task DeleteUserUserAsync(ulong qqId)
+    {
+        dataStore.DeleteUser(qqId);
+
+        return Task.CompletedTask;
     }
 }

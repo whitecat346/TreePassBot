@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace TreePassBot.Data.Entities;
 
 public enum AuditStatus
@@ -7,7 +9,7 @@ public enum AuditStatus
     Denied
 }
 
-public class PendingUser
+public record PendingUser
 {
     public ulong QqId { get; set; }
     public AuditStatus Status { get; set; } = AuditStatus.Pending;
