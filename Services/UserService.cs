@@ -46,6 +46,7 @@ public class UserService(
         user.Status = status;
         user.Passcode = passcode;
         user.UpdatedAt = DateTime.UtcNow;
+        user.ExpriedAt = DateTime.UtcNow + TimeSpan.FromMinutes(10);
 
         dataStore.UpdateUser(user);
         return Task.FromResult(true);
@@ -71,7 +72,7 @@ public class UserService(
     }
 
     /// <inheritdoc />
-    public Task DeleteUserUserAsync(ulong qqId)
+    public Task DeleteUserAsync(ulong qqId)
     {
         dataStore.DeleteUser(qqId);
 

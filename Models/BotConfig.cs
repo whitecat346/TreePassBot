@@ -8,5 +8,7 @@ public class BotConfig
     public List<ulong> AuditorQqIds { get; init; } = [];
     public string QuestionnaireLink { get; init; } = "Undefined";
 
+    public ulong AdminQqId { get; init; }
+
     public string DataFile { get; init; } = "bot_data.json";
 }

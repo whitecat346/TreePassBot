@@ -15,8 +15,25 @@ public class QqBotService : IHostedService
         MakabakaApp.BotContext.OnGroupMessage += OnGroupMessageHelper;
         MakabakaApp.BotContext.OnGroupMemberIncrease += OnGroupMemberIncreaseHelper;
         MakabakaApp.BotContext.OnGroupMemberDecrease += OnGroupMemberDecreaseHelper;
+        MakabakaApp.BotContext.OnPrivateMessage += OnPrivateMessageHelper;
 
         await MakabakaApp.StartAsync(ct);
+    }
+
+    #region Helper Method
+
+    private static Task OnPrivateMessageHelper(object sender, PrivateMessageEventArgs e)
+    {
+        var handler =
+            (PrivateMessageEventHandler)Program.AppHost.Services.GetService(typeof(PrivateMessageEventHandler))!;
+        return handler.HandlePrivateMessage(e);
+    }
+
+    private static Task OnGroupMemberIncreaseHelper(object sender, GroupMemberIncreaseEventArgs e)
+    {
+        var handler =
+            (GroupMemberEventHandler)Program.AppHost.Services.GetService(typeof(GroupMemberEventHandler))!;
+        return handler.HandleGroupMemberIncrease(e);
     }
 
     private static Task OnGroupMemberDecreaseHelper(object sender, GroupMemberDecreaseEventArgs e)
@@ -24,16 +41,6 @@ public class QqBotService : IHostedService
         var handler =
             (GroupMemberEventHandler)Program.AppHost.Services.GetService(typeof(GroupMemberEventHandler))!;
         return handler.HandleGroupMemberDecrease(e);
-    }
-
-
-    #region Helper Method
-
-    private static Task OnGroupMemberIncreaseHelper(object sender, GroupMemberIncreaseEventArgs e)
-    {
-        var handler =
-            (GroupMemberEventHandler)Program.AppHost.Services.GetService(typeof(GroupMemberEventHandler))!;
-        return handler.HandleGroupMemberIncrease(e);
     }
 
     private static Task OnGroupAddRequestHelper(object sender, GroupAddRequestEventArgs e)
@@ -46,7 +53,7 @@ public class QqBotService : IHostedService
     {
         var handler =
             (GroupMessageEventHandler)Program.AppHost.Services.GetService(typeof(GroupMessageEventHandler))!;
-        return handler.HandleGroupMessage(sender, e);
+        return handler.HandleGroupMessage(e);
     }
 
     #endregion

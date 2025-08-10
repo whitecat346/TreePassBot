@@ -1,4 +1,5 @@
 using Makabaka.Events;
+using Makabaka.Messages;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TreePassBot.Models;
@@ -9,6 +10,7 @@ namespace TreePassBot.Handlers;
 public class GroupMemberEventHandler(
     IUserService userService,
     ILogger<GroupMemberEventHandler> logger,
+    IMessageService messageService,
     IOptions<BotConfig> config)
 {
     private readonly BotConfig _config = config.Value;
@@ -22,6 +24,12 @@ public class GroupMemberEventHandler(
 
         logger.LogInformation("New member {UserId} joined group {GroupId}.", e.UserId, e.GroupId);
         await userService.AddPendingUserAsync(e.UserId);
+
+        await messageService.SendGroupMessageAsync(e.GroupId,
+        [
+            new AtSegment(e.UserId), new TextSegment("欢迎来到审核群，请填写下面的问卷进行审核："),
+            new TextSegment(config.Value.QuestionnaireLink)
+        ]);
     }
 
     public async Task HandleGroupMemberDecrease(GroupMemberDecreaseEventArgs e)
@@ -32,6 +40,6 @@ public class GroupMemberEventHandler(
         }
 
         logger.LogInformation("Remove {UserId} from {groupId}", e.UserId, e.GroupId);
-        await userService.DeleteUserUserAsync(e.UserId);
+        await userService.DeleteUserAsync(e.UserId);
     }
 }

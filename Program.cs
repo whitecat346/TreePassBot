@@ -7,6 +7,7 @@ using TreePassBot.Handlers;
 using TreePassBot.Models;
 using TreePassBot.Services;
 using TreePassBot.Services.Interfaces;
+using TreePassBot.Utils;
 
 namespace TreePassBot;
 #nullable disable
@@ -43,8 +44,12 @@ internal class Program
                     services.AddScoped<IAuditService, AudioService>();
                     services.AddScoped<IMessageService, MessageService>();
 
+                    services.AddSingleton<PasscodeGeneratorUtil>();
+
                     services.AddSingleton<GroupMessageEventHandler>();
                     services.AddSingleton<GroupRequestEventHandler>();
+                    services.AddSingleton<GroupMemberEventHandler>();
+                    services.AddSingleton<PrivateMessageEventHandler>();
 
                     services.AddHostedService<QqBotService>();
                 }))

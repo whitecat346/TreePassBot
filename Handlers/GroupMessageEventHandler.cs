@@ -20,24 +20,26 @@ public partial class GroupMessageEventHandler(
     private readonly BotConfig _config = config.Value;
     private static readonly Regex CommandRegex = AuditorCommandRegex();
 
-    public async Task HandleGroupMessage(object sender, GroupMessageEventArgs e)
+    public async Task HandleGroupMessage(GroupMessageEventArgs e)
     {
         var msg = e.Message.ToString().Trim();
 
-#if DEBUG
         if (msg.StartsWith('.'))
         {
             await HandleAdminCommandAsync(e);
             return;
         }
-#endif
-
 
         await HandleAuditorCommandAsync(e);
     }
 
     private async Task HandleAdminCommandAsync(GroupMessageEventArgs e)
     {
+        if (_config.AdminQqId  != e.UserId)
+        {
+            return;
+        }
+
         var message = e.Message.ToString();
         var groupId = e.GroupId;
         var parts = message.Split(' ', StringSplitOptions.RemoveEmptyEntries);

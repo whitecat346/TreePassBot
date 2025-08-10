@@ -8,5 +8,5 @@ public interface IUserService
     Task<PendingUser?> GetPendingUserAsync(ulong qqId);
     Task<bool> UpdateUserStatusAsync(ulong qqId, AuditStatus status, string passcode);
     Task<bool> ValidateJoinRequestAsync(ulong qqId, string passcode);
-    Task DeleteUserUserAsync(ulong qqId);
+    Task DeleteUserAsync(ulong qqId);
 }

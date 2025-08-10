@@ -1,30 +1,52 @@
 using System.Text.Json;
+using System.Timers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TreePassBot.Data.Entities;
 using TreePassBot.Models;
+using Timer = System.Timers.Timer;
 
 namespace TreePassBot.Data;
 
 public sealed class JsonDataStore : IDisposable
 {
     private readonly string _filePath;
-    private readonly PendingUserData _data;
+    private readonly UserData _data;
     private static readonly object Lock = new();
     private volatile bool _disposed;
     private readonly ILogger<JsonDataStore> _logger;
+    private readonly Timer _timer = new(TimeSpan.TicksPerMinute);
 
     public JsonDataStore(IOptions<BotConfig> config, ILogger<JsonDataStore> logger)
     {
         _logger = logger;
         _filePath = config.Value.DataFile;
 
+        _timer.AutoReset = true;
+        _timer.Enabled = true;
+        _timer.Elapsed += ExprieTimeOutPasscode;
 
         // Load data first before starting timer
         _data = LoadData();
+
+        _timer.Start();
     }
 
-    private PendingUserData LoadData()
+    private void ExprieTimeOutPasscode(object? sender, ElapsedEventArgs e)
+    {
+        lock (Lock)
+        {
+            foreach (var pendingUser in _data.Users.Where(pendingUser => pendingUser.ExpriedAt < DateTime.UtcNow))
+            {
+                pendingUser.Status = AuditStatus.Expried;
+                pendingUser.Passcode = string.Empty;
+            }
+
+            SaveChange();
+        }
+    }
+
+    private UserData LoadData()
     {
         lock (Lock)
         {
@@ -32,24 +54,24 @@ public sealed class JsonDataStore : IDisposable
             {
                 if (!File.Exists(_filePath))
                 {
-                    return new PendingUserData();
+                    return new UserData();
                 }
 
                 var json = File.ReadAllText(_filePath);
                 if (string.IsNullOrWhiteSpace(json))
                 {
-                    return new PendingUserData();
+                    return new UserData();
                 }
 
                 return JsonSerializer.Deserialize(
-                           json, typeof(PendingUserData), PendingUserDataContext.Default) as PendingUserData
-                       ?? new PendingUserData();
+                           json, typeof(UserData), UserDataContext.Default) as UserData
+                       ?? new UserData();
             }
             catch (Exception ex)
             {
                 // 文件损坏时返回新实例而不是抛出异常
                 _logger.LogWarning($"Error loading data file {_filePath}: {ex.Message}");
-                return new PendingUserData();
+                return new UserData();
             }
         }
     }
@@ -69,7 +91,7 @@ public sealed class JsonDataStore : IDisposable
                     Directory.CreateDirectory(directory);
                 }
 
-                var json = JsonSerializer.Serialize(_data, typeof(PendingUserData), PendingUserDataContext.Default);
+                var json = JsonSerializer.Serialize(_data, typeof(UserData), UserDataContext.Default);
 
                 // 原子写入：先写入临时文件，然后移动到目标文件
                 var tempPath = _filePath + ".tmp";
@@ -241,11 +263,9 @@ public sealed class JsonDataStore : IDisposable
         }
     }
 
-
     public void Dispose()
     {
         Dispose(true);
-        GC.SuppressFinalize(this);
     }
 
     private void Dispose(bool disposing)
@@ -257,6 +277,7 @@ public sealed class JsonDataStore : IDisposable
                 // 最后保存一次数据
                 try
                 {
+                    _timer.Stop();
                     SaveChange();
                 }
                 catch

@@ -2,7 +2,7 @@ using TreePassBot.Data.Entities;
 
 namespace TreePassBot.Data;
 
-public record PendingUserData
+public record UserData
 {
     public List<PendingUser> Users { get; set; } = [];
 }

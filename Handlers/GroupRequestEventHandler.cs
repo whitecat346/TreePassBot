@@ -14,20 +14,35 @@ public class GroupRequestEventHandler(
     IOptions<BotConfig> config,
     ILogger<GroupRequestEventHandler> logger)
 {
+    private readonly BotConfig _config = config.Value;
+
     public async Task HandleAddRequest(GroupAddRequestEventArgs e)
     {
-        if (!config.Value.MainGroupId.Contains(e.GroupId))
+        if (_config.MainGroupId.Contains(e.GroupId))
         {
-            return;
+            await MainGroupHandlerAsync(e);
         }
 
+        if (_config.AuditGroupId == e.GroupId)
+        {
+            await AuditGroupHandlerAsync(e);
+        }
+    }
+
+    private async Task AuditGroupHandlerAsync(GroupAddRequestEventArgs e)
+    {
+        await e.AcceptAsync();
+    }
+
+    private async Task MainGroupHandlerAsync(GroupAddRequestEventArgs e)
+    {
         try
         {
             var rightPasscode = await userService.ValidateJoinRequestAsync(e.UserId, e.Comment);
             if (rightPasscode)
             {
                 await e.AcceptAsync();
-                await userService.DeleteUserUserAsync(e.UserId);
+                await userService.DeleteUserAsync(e.UserId);
                 logger.LogInformation("User {qqId} passed audit.", e.UserId);
 
                 await messageService.SendPrivateMessageAsync(e.UserId, [new TextSegment("您的申请已通过！")]);
@@ -35,7 +50,7 @@ public class GroupRequestEventHandler(
             }
             else
             {
-                await e.RejectAsync("验证码不正确！");
+                await e.RejectAsync("验证码不正确！可能已经过期，请私信机器人刷新");
                 logger.LogInformation("User {qqId} was denied by wrong passcode.", e.UserId);
             }
         }
