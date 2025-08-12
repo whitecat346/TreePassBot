@@ -35,7 +35,7 @@ public partial class GroupMessageEventHandler(
 
     private async Task HandleAdminCommandAsync(GroupMessageEventArgs e)
     {
-        if (_config.AdminQqId  != e.UserId)
+        if (_config.AdminQqIds.Contains(e.UserId))
         {
             return;
         }
@@ -45,7 +45,7 @@ public partial class GroupMessageEventHandler(
         var parts = message.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var command = parts[0].ToLower(); // e.g., ".rand"
 
-        logger.LogInformation("Admin {AdminId} issued test command: {Command}", groupId, message);
+        logger.LogInformation("Admin {AdminId} issued test command: {Command}", e.UserId, message);
 
         switch (command)
         {
@@ -56,7 +56,7 @@ public partial class GroupMessageEventHandler(
             case ".check":
                 if (parts.Length < 2 || !ulong.TryParse(parts[1], out var qqToCheck))
                 {
-                    await messageService.SendGroupMessageAsync(groupId, [new TextSegment("用法: .check [QQ号]")]);
+                    await e.ReplyAsync([new TextSegment("用法: .check [QQ号]")]);
                     return;
                 }
 
@@ -66,7 +66,7 @@ public partial class GroupMessageEventHandler(
             case ".addtest":
                 if (parts.Length < 2 || !ulong.TryParse(parts[1], out var qqToAdd))
                 {
-                    await messageService.SendGroupMessageAsync(groupId, [new TextSegment("用法: .addtest [QQ号]")]);
+                    await e.ReplyAsync([new TextSegment("用法: .addtest [QQ号]")]);
                     return;
                 }
 
@@ -74,15 +74,23 @@ public partial class GroupMessageEventHandler(
                 break;
 
             case ".help":
-                const string helpText = "可用测试命令:\n" +
+                const string helpText = "可用命令（仅限管理员使用）:\n" +
                                         ".rand - 测试生成一个唯一的10位验证码\n" +
                                         ".check [QQ号] - 查看指定用户的审核状态\n" +
-                                        ".addtest [QQ号] - 手动添加一个用户到待审核列表";
-                await messageService.SendGroupMessageAsync(groupId, [new TextSegment(helpText)]);
+                                        ".addtest [QQ号] - 手动添加一个用户到待审核列表\n" +
+                                        ".audit-help - 查看审核相关命令";
+                await e.ReplyAsync([new TextSegment(helpText)]);
+                break;
+
+            case ".audit-help":
+                const string auditHelpText = "审核员命令:\n" +
+                                             "使用 @+QQ号 pass - 通过指定用户的审核\n" +
+                                             "使用 @+QQ号 deny - 拒绝指定用户的审核";
+                await e.ReplyAsync([new TextSegment(auditHelpText)]);
                 break;
 
             default:
-                await messageService.SendGroupMessageAsync(groupId,
+                await e.ReplyAsync(
                     [new TextSegment($"未知命令: {command}。发送 .help 查看帮助。")]);
                 break;
         }

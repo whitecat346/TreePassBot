@@ -1,7 +1,6 @@
 using Makabaka.Messages;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using TreePassBot.Data;
 using TreePassBot.Data.Entities;
 using TreePassBot.Models;
 using TreePassBot.Services.Interfaces;
@@ -12,7 +11,6 @@ namespace TreePassBot.Services;
 public class AudioService(
     IUserService userService,
     IMessageService messageService,
-    JsonDataStore dataStore,
     PasscodeGeneratorUtil generator,
     IOptions<BotConfig> config,
     ILogger<AudioService> logger) : IAuditService
@@ -107,7 +105,16 @@ public class AudioService(
         {
             await messageService.SendPrivateMessageAsync(targetQqId, [new TextSegment(reason)]);
             await QqBotService.MakabakaApp.BotContext.KickGroupMemberAsync(config.Value.AuditGroupId, targetQqId);
+
+            // unsure whether kick cause GroupMemberDrcrease event
+            // and which will cause delete user event in this program.
+            // so i decided to call delete user directly
+            // for ensure user is deleted from data store.
+            await userService.DeleteUserAsync(targetQqId);
+
+            return true;
         }
+
         await userService.UpdateUserStatusAsync(targetQqId, status, string.Empty);
 
         await messageService.SendPrivateMessageAsync(targetQqId,

@@ -63,8 +63,7 @@ public sealed class JsonDataStore : IDisposable
                     return new UserData();
                 }
 
-                return JsonSerializer.Deserialize(
-                           json, typeof(UserData), UserDataContext.Default) as UserData
+                return JsonSerializer.Deserialize(json, typeof(UserData), UserDataContext.Default) as UserData
                        ?? new UserData();
             }
             catch (Exception ex)
