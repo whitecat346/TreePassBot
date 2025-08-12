@@ -46,10 +46,11 @@ public class AudioService(
 
         if (success)
         {
-            await messageService.SendPrivateMessageAsync(targetQqId,
-                [new TextSegment($"您的审核已通过！请在入群申请中填写以下验证码：{passcode}\n"),
+            await messageService.SendGroupMessageAsync(groupId,
+                [new AtSegment(targetQqId),
+                    new TextSegment($"您的审核已通过！请在入群申请中填写以下验证码：{passcode}\n"),
                     new TextSegment("该验证码将在10分钟后过期，过期后可私信该机器人重新生成。\n"),
-                    new TextSegment("验证码与QQ号一一对应，不用再尝试发给别人了 (～￣▽￣)～")]);
+                    new TextSegment("验证码与QQ号一一对应，不用再尝试了 (～￣▽￣)～")]);
         }
 
         logger.LogInformation("User {TargetQqId} has been approved by operator {OperatorQqId}.", targetQqId, operatorQqId);
@@ -81,21 +82,21 @@ public class AudioService(
             return false;
         }
 
-        string reason;
+        string lastChance;
         AuditStatus status;
         switch (user.Status )
             {
                 case AuditStatus.Pending :
                     status = AuditStatus.Suspend;
-                    reason = "您还有2次审核机会";
+                    lastChance = "您还有2次审核机会";
                     break;
                 case AuditStatus.Suspend:
                     status = AuditStatus.Dying;
-                    reason = "您还有1次审核机会";
+                    lastChance = "您还有1次审核机会";
                     break;
                 case AuditStatus.Dying:
                     status = AuditStatus.Denied;
-                    reason = "很抱歉，您的三次审核机会已用尽！";
+                    lastChance = "很抱歉，您的三次审核机会已用尽！";
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(user.Status));
@@ -103,7 +104,7 @@ public class AudioService(
 
         if (status is AuditStatus.Denied)
         {
-            await messageService.SendPrivateMessageAsync(targetQqId, [new TextSegment(reason)]);
+            await messageService.SendGroupMessageAsync(groupId, [new TextSegment(lastChance)]);
             await QqBotService.MakabakaApp.BotContext.KickGroupMemberAsync(config.Value.AuditGroupId, targetQqId);
 
             // unsure whether kick cause GroupMemberDrcrease event
@@ -117,8 +118,10 @@ public class AudioService(
 
         await userService.UpdateUserStatusAsync(targetQqId, status, string.Empty);
 
-        await messageService.SendPrivateMessageAsync(targetQqId,
-            [new TextSegment("很抱歉，您的审核未通过！"), new TextSegment(reason)]);
+        await messageService.SendGroupMessageAsync(groupId,
+            [new AtSegment(targetQqId),
+                new TextSegment("很抱歉，您的审核未通过！"),
+                new TextSegment(lastChance)]);
 
         logger.LogInformation("User {TargetQqId} has been denied approval by operator {OperatorQqId}.", targetQqId, operatorQqId);
 

@@ -25,10 +25,15 @@ public class GroupMemberEventHandler(
         logger.LogInformation("New member {UserId} joined group {GroupId}.", e.UserId, e.GroupId);
         await userService.AddPendingUserAsync(e.UserId);
 
+        var queUrlIndex = Random.Shared.Next(0, 3);
+        var queUrl = _config.QuestionnaireLinks[queUrlIndex];
+
         await messageService.SendGroupMessageAsync(e.GroupId,
         [
-            new AtSegment(e.UserId), new TextSegment("欢迎来到审核群，请填写下面的问卷进行审核："),
-            new TextSegment(config.Value.QuestionnaireLink)
+            new AtSegment(e.UserId),
+            new TextSegment("欢迎来到审核群，请填写下面的问卷进行审核：\n"),
+            new TextSegment(queUrl),
+            new TextSegment("\n建议使用浏览器访问，而不是在QQ中打开。")
         ]);
     }
 
