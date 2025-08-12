@@ -45,7 +45,7 @@ public class GroupRequestEventHandler(
                 await userService.DeleteUserAsync(e.UserId);
                 logger.LogInformation("User {qqId} passed audit.", e.UserId);
 
-                await messageService.SendPrivateMessageAsync(e.UserId, [new TextSegment("您的申请已通过！")]);
+                await messageService.SendPrivateMessageAsync(e.UserId, [new TextSegment("您的加群申请已通过！")]);
                 await QqBotService.MakabakaApp.BotContext.KickGroupMemberAsync(config.Value.AuditGroupId, e.UserId);
             }
             else

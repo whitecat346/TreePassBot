@@ -21,7 +21,7 @@ public class AudioService(
         var user = await userService.GetPendingUserAsync(targetQqId);
         if (user is null)
         {
-            logger.LogError($"Targe user: {targetQqId} not contains in pending list.");
+            logger.LogError("Targe user: {TargetQqId} not contains in pending list.", targetQqId);
 
             await messageService.SendGroupMessageAsync(groupId,
                 [new AtSegment(operatorQqId), new TextSegment("目标QQ号未找到！")]);
@@ -31,7 +31,7 @@ public class AudioService(
 
         if (user.Status is AuditStatus.Approved or AuditStatus.Expried)
         {
-            logger.LogError($"Targe user: {targetQqId} has been processed.");
+            logger.LogError("Targe user: {TargetQqId} has been processed.", targetQqId);
 
             await messageService.SendGroupMessageAsync(groupId,
                 [new AtSegment(operatorQqId), new TextSegment("目标QQ号已被处理！")]);
@@ -47,7 +47,9 @@ public class AudioService(
         if (success)
         {
             await messageService.SendPrivateMessageAsync(targetQqId,
-                [new TextSegment($"您的审核已通过！请在入群申请中填写以下验证码：{passcode}")]);
+                [new TextSegment($"您的审核已通过！请在入群申请中填写以下验证码：{passcode}\n"),
+                    new TextSegment("该验证码将在10分钟后过期，过期后可私信该机器人重新生成。\n"),
+                    new TextSegment("验证码与QQ号一一对应，不用再尝试发给别人了 (～￣▽￣)～")]);
         }
 
         logger.LogInformation("User {TargetQqId} has been approved by operator {OperatorQqId}.", targetQqId, operatorQqId);
@@ -85,20 +87,18 @@ public class AudioService(
             {
                 case AuditStatus.Pending :
                     status = AuditStatus.Suspend;
-                    reason = "您有3次审核机会";
+                    reason = "您还有2次审核机会";
                     break;
                 case AuditStatus.Suspend:
                     status = AuditStatus.Dying;
-                    reason = "您还有2次审核机会";
+                    reason = "您还有1次审核机会";
                     break;
                 case AuditStatus.Dying:
                     status = AuditStatus.Denied;
-                    reason = "您还有1次审核机会";
+                    reason = "很抱歉，您的三次审核机会已用尽！";
                     break;
                 default:
-                    reason = "很抱歉，您的三次审核机会已用尽，无法再申请审核！";
-                    status = AuditStatus.Denied;
-                    break;
+                    throw new ArgumentOutOfRangeException(nameof(user.Status));
             }
 
         if (status is AuditStatus.Denied)

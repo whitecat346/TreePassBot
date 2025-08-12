@@ -136,7 +136,8 @@ public sealed class JsonDataStore : IDisposable
                 Status = user.Status,
                 Passcode = user.Passcode,
                 CreatedAt = user.CreatedAt,
-                UpdatedAt = user.UpdatedAt
+                UpdatedAt = user.UpdatedAt,
+                ExpriedAt = user.ExpriedAt
             };
         }
     }
@@ -185,6 +186,7 @@ public sealed class JsonDataStore : IDisposable
                 Passcode = user.Passcode,
                 CreatedAt = user.CreatedAt == default ? DateTime.UtcNow : user.CreatedAt,
                 UpdatedAt = DateTime.UtcNow,
+                ExpriedAt = user.ExpriedAt
             };
 
             _data.Users.Add(newUser);
@@ -210,6 +212,7 @@ public sealed class JsonDataStore : IDisposable
             existingUser.Status = user.Status;
             existingUser.Passcode = user.Passcode;
             existingUser.UpdatedAt = DateTime.UtcNow;
+            existingUser.ExpriedAt = user.ExpriedAt;
 
             SaveChange();
             return true;

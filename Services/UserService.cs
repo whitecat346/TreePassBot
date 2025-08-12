@@ -46,7 +46,11 @@ public class UserService(
         user.Status = status;
         user.Passcode = passcode;
         user.UpdatedAt = DateTime.UtcNow;
-        user.ExpriedAt = DateTime.UtcNow + TimeSpan.FromMinutes(10);
+
+        if (status is AuditStatus.Approved or AuditStatus.Expried)
+        {
+            user.ExpriedAt = DateTime.UtcNow + TimeSpan.FromMinutes(10);
+        }
 
         dataStore.UpdateUser(user);
         return Task.FromResult(true);
@@ -61,14 +65,7 @@ public class UserService(
             throw new ArgumentNullException(nameof(user), "User not found in data store.");
         }
 
-        if (user.Passcode.Equals(passcode, StringComparison.OrdinalIgnoreCase))
-        {
-            user.Status = AuditStatus.Approved;
-            dataStore.UpdateUser(user);
-            return Task.FromResult(true);
-        }
-
-        return Task.FromResult(false);
+        return Task.FromResult(user.Passcode.Equals(passcode, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <inheritdoc />
