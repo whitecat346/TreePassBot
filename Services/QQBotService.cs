@@ -15,7 +15,7 @@ public class QqBotService : IHostedService
         MakabakaApp.BotContext.OnGroupMessage += OnGroupMessageHelper;
         MakabakaApp.BotContext.OnGroupMemberIncrease += OnGroupMemberIncreaseHelper;
         MakabakaApp.BotContext.OnGroupMemberDecrease += OnGroupMemberDecreaseHelper;
-        MakabakaApp.BotContext.OnPrivateMessage += OnPrivateMessageHelper;
+        //MakabakaApp.BotContext.OnPrivateMessage += OnPrivateMessageHelper;
 
         await MakabakaApp.StartAsync(ct);
     }

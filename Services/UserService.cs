@@ -57,7 +57,7 @@ public class UserService(
     }
 
     /// <inheritdoc />
-    public Task<bool> ValidateJoinRequestAsync(ulong qqId, string passcode)
+    public Task<(bool, bool)> ValidateJoinRequestAsync(ulong qqId, string passcode)
     {
         var user = dataStore.GetUserByQqId(qqId);
         if (user == null)
@@ -65,7 +65,10 @@ public class UserService(
             throw new ArgumentNullException(nameof(user), "User not found in data store.");
         }
 
-        return Task.FromResult(user.Passcode.Equals(passcode, StringComparison.OrdinalIgnoreCase));
+        var rightPasscode = user.Passcode.Equals(passcode, StringComparison.OrdinalIgnoreCase);
+        var expriedPassscode = user.Status == AuditStatus.Expried;
+
+        return Task.FromResult((rightPasscode, expriedPassscode));
     }
 
     /// <inheritdoc />

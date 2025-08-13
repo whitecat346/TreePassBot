@@ -47,10 +47,12 @@ public class AudioService(
         if (success)
         {
             await messageService.SendGroupMessageAsync(groupId,
-                [new AtSegment(targetQqId),
-                    new TextSegment($"您的审核已通过！请在入群申请中填写以下验证码：{passcode}\n"),
-                    new TextSegment("该验证码将在10分钟后过期，过期后可私信该机器人重新生成。\n"),
-                    new TextSegment("验证码与QQ号一一对应，不用再尝试了 (～￣▽￣)～")]);
+            [
+                new AtSegment(targetQqId),
+                new TextSegment($"您的审核已通过！请在入群申请中填写以下验证码：{passcode}\n"),
+                new TextSegment("该验证码将在10分钟后过期，过期后可在此群聊中@机器人重新生成。\n"),
+                new TextSegment("验证码与QQ号一一对应，不用再尝试其他人的验证码了 (～￣▽￣)～")
+            ]);
         }
 
         logger.LogInformation("User {TargetQqId} has been approved by operator {OperatorQqId}.", targetQqId, operatorQqId);
@@ -104,14 +106,19 @@ public class AudioService(
 
         if (status is AuditStatus.Denied)
         {
-            await messageService.SendGroupMessageAsync(groupId, [new TextSegment(lastChance)]);
-            await QqBotService.MakabakaApp.BotContext.KickGroupMemberAsync(config.Value.AuditGroupId, targetQqId);
+            await messageService.SendGroupMessageAsync(groupId,
+                [new AtSegment(targetQqId), new TextSegment(lastChance)]);
+            var apiResponse = await QqBotService.MakabakaApp.BotContext.KickGroupMemberAsync(groupId, targetQqId);
 
-            // unsure whether kick cause GroupMemberDrcrease event
+            logger.LogInformation("Kick group member response: {response}", apiResponse.Status);
+
+            // unsure whether kick cause GroupMemberDecrease event
             // and which will cause delete user event in this program.
             // so i decided to call delete user directly
             // for ensure user is deleted from data store.
             await userService.DeleteUserAsync(targetQqId);
+
+            logger.LogInformation("User {TargetQqId} has been kicked and deleted from data store.", targetQqId);
 
             return true;
         }

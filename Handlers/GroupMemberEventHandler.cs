@@ -25,7 +25,7 @@ public class GroupMemberEventHandler(
         logger.LogInformation("New member {UserId} joined group {GroupId}.", e.UserId, e.GroupId);
         await userService.AddPendingUserAsync(e.UserId);
 
-        var queUrlIndex = Random.Shared.Next(0, 3);
+        var queUrlIndex = Random.Shared.Next(0, _config.QuestionnaireLinks.Count);
         var queUrl = _config.QuestionnaireLinks[queUrlIndex];
 
         await messageService.SendGroupMessageAsync(e.GroupId,

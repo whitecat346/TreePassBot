@@ -1,5 +1,4 @@
 using Makabaka.Events;
-using Makabaka.Messages;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TreePassBot.Models;
@@ -10,7 +9,6 @@ namespace TreePassBot.Handlers;
 
 public class GroupRequestEventHandler(
     IUserService userService,
-    IMessageService messageService,
     IOptions<BotConfig> config,
     ILogger<GroupRequestEventHandler> logger)
 {
@@ -32,13 +30,14 @@ public class GroupRequestEventHandler(
     private async Task AuditGroupHandlerAsync(GroupAddRequestEventArgs e)
     {
         await e.AcceptAsync();
+        logger.LogInformation("New user {qqId} joined audit group {groupId}", e.UserId, e.GroupId);
     }
 
     private async Task MainGroupHandlerAsync(GroupAddRequestEventArgs e)
     {
         try
         {
-            var rightPasscode = await userService.ValidateJoinRequestAsync(e.UserId, e.Comment);
+            var (rightPasscode, expriedPasscode) = await userService.ValidateJoinRequestAsync(e.UserId, e.Comment);
             if (rightPasscode)
             {
                 await e.AcceptAsync();
@@ -47,9 +46,14 @@ public class GroupRequestEventHandler(
 
                 await QqBotService.MakabakaApp.BotContext.KickGroupMemberAsync(config.Value.AuditGroupId, e.UserId);
             }
+            else if (expriedPasscode)
+            {
+                await e.RejectAsync("验证码以过期，请在审核群中@机器人刷新！");
+                logger.LogInformation("User {qqId} 's passcode was expried.", e.UserId);
+            }
             else
             {
-                await e.RejectAsync("验证码不正确！可能已经过期，请私信机器人刷新");
+                await e.RejectAsync("验证码不正确！");
                 logger.LogInformation("User {qqId} was denied by wrong passcode.", e.UserId);
             }
         }

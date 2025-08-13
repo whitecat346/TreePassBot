@@ -4,8 +4,10 @@ using Makabaka.Messages;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TreePassBot.Data;
+using TreePassBot.Data.Entities;
 using TreePassBot.Models;
 using TreePassBot.Services.Interfaces;
+using TreePassBot.Utils;
 
 namespace TreePassBot.Handlers;
 
@@ -15,6 +17,7 @@ public partial class GroupMessageEventHandler(
     IMessageService messageService,
     JsonDataStore dataStore,
     IOptions<BotConfig> config,
+    PasscodeGeneratorUtil generator,
     ILogger<GroupMessageEventHandler> logger)
 {
     private readonly BotConfig _config = config.Value;
@@ -24,22 +27,75 @@ public partial class GroupMessageEventHandler(
     {
         var msg = e.Message.ToString().Trim();
 
-        if (msg.StartsWith('.'))
+#if DEBUG
+        logger.LogInformation("Received group message from {GroupId} by {UserId}: {Message}",
+            e.GroupId, e.UserId, msg);
+#endif
+
+        if (_config.AuditorQqIds.Contains(e.UserId) && e.Message[0] is AtSegment)
         {
+#if DEBUG
+            logger.LogInformation("Handle auditor command: {message}", msg);
+#endif
+
+            await HandleAuditorCommandAsync(e);
+            return;
+        }
+
+        if (_config.AdminQqIds.Contains(e.UserId) && msg.StartsWith('.'))
+        {
+#if DEBUG
+            logger.LogInformation("Handle admin command: {msg}", msg);
+#endif
+
             await HandleAdminCommandAsync(e);
             return;
         }
 
-        await HandleAuditorCommandAsync(e);
+        if (e.Message[0] is AtSegment && e.Message.Count == 1)
+        {
+#if DEBUG
+            logger.LogInformation("Handle refresh passcode command: {msg}", msg);
+#endif
+
+            await HandleRefreshPasscodeAsync(e);
+        }
+
+#if DEBUG
+        logger.LogInformation("Do nothing.");
+#endif
     }
 
-    private async Task HandleAdminCommandAsync(GroupMessageEventArgs e)
+    private async Task HandleRefreshPasscodeAsync(GroupMessageEventArgs e)
     {
-        if (_config.AdminQqIds.Contains(e.UserId))
+        var user = dataStore.GetUserByQqId(e.UserId);
+        if (user == null)
         {
             return;
         }
 
+        if (user.Status == AuditStatus.Expried)
+        {
+            var passcode = await generator.GenerateUniquePasscodeAsync();
+            user.Passcode = passcode;
+            user.Status = AuditStatus.Approved;
+            user.ExpriedAt = DateTime.UtcNow + TimeSpan.FromMinutes(10);
+
+            dataStore.UpdateUser(user);
+
+            await e.ReplyAsync([
+                new AtSegment(e.UserId),
+                new TextSegment("您的新验证码是："),
+                new TextSegment(user.Passcode)
+            ]);
+
+            logger.LogInformation("User {qqId} passed expried, generating new passcode: {passcode}.", e.UserId,
+                passcode);
+        }
+    }
+
+    private async Task HandleAdminCommandAsync(GroupMessageEventArgs e)
+    {
         var message = e.Message.ToString();
         var groupId = e.GroupId;
         var parts = message.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -50,10 +106,16 @@ public partial class GroupMessageEventHandler(
         switch (command)
         {
             case ".rand":
+#if DEBUG
+                logger.LogInformation("In rand test command.");
+#endif
                 await TestRandomGeneration(groupId);
                 break;
 
             case ".check":
+#if DEBUG
+                logger.LogInformation("In check test command.");
+#endif
                 if (parts.Length < 2 || !ulong.TryParse(parts[1], out var qqToCheck))
                 {
                     await e.ReplyAsync([new TextSegment("用法: .check [QQ号]")]);
@@ -64,6 +126,9 @@ public partial class GroupMessageEventHandler(
                 break;
 
             case ".addtest":
+#if DEBUG
+                logger.LogInformation("In addtest test command.");
+#endif
                 if (parts.Length < 2 || !ulong.TryParse(parts[1], out var qqToAdd))
                 {
                     await e.ReplyAsync([new TextSegment("用法: .addtest [QQ号]")]);
@@ -74,6 +139,9 @@ public partial class GroupMessageEventHandler(
                 break;
 
             case ".reset":
+#if DEBUG
+                logger.LogInformation("In reset test command.");
+#endif
                 if (parts.Length < 2 || !ulong.TryParse(parts[1], out var qqToReset))
                 {
                     await e.ReplyAsync([new TextSegment("用法: .reset [QQ号]")]);
@@ -81,9 +149,13 @@ public partial class GroupMessageEventHandler(
                 }
 
                 await TestResetUser(groupId, qqToReset);
+                await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("用户审核状态已重置。")]);
                 break;
 
             case ".audit-help":
+#if DEBUG
+                logger.LogInformation("In audit-help test command.");
+#endif
                 const string auditHelpText = "审核员命令:\n" +
                                              "使用 @+QQ号 pass - 通过指定用户的审核\n" +
                                              "使用 @+QQ号 deny - 拒绝指定用户的审核";
@@ -91,11 +163,17 @@ public partial class GroupMessageEventHandler(
                 break;
 
             case ".links":
+#if DEBUG
+                logger.LogInformation("In links test command.");
+#endif
                 var msg = string.Join('\n', _config.QuestionnaireLinks);
                 await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment(msg)]);
                 break;
 
             case ".help":
+#if DEBUG
+                logger.LogInformation("In help test command.");
+#endif
                 const string helpText = "可用命令（仅限管理员使用）:\n" +
                                         ".rand - 测试生成一个唯一的10位验证码\n" +
                                         ".check [QQ号] - 查看指定用户的审核状态\n" +
@@ -107,6 +185,9 @@ public partial class GroupMessageEventHandler(
                 break;
 
             default:
+#if DEBUG
+                logger.LogInformation("In unknow command.");
+#endif
                 await e.ReplyAsync(
                     [new TextSegment($"未知命令: {command}。发送 .help 查看帮助。")]);
                 break;
@@ -122,12 +203,6 @@ public partial class GroupMessageEventHandler(
 
         if (_config.AuditGroupId != e.GroupId)
         {
-            return;
-        }
-
-        if (_config.AuditorQqIds.Contains(e.UserId))
-        {
-            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("您不是审核员！")]);
             return;
         }
 
