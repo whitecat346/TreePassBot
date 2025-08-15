@@ -1,19 +1,16 @@
 using Makabaka.Messages;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using TreePassBot.Data.Entities;
-using TreePassBot.Models;
 using TreePassBot.Services.Interfaces;
 using TreePassBot.Utils;
 
 namespace TreePassBot.Services;
 
-public class AudioService(
+public class AuditService(
     IUserService userService,
     IMessageService messageService,
     PasscodeGeneratorUtil generator,
-    IOptions<BotConfig> config,
-    ILogger<AudioService> logger) : IAuditService
+    ILogger<AuditService> logger) : IAuditService
 {
     /// <inheritdoc />
     public async Task<bool> ProcessApprovalAsync(ulong targetQqId, ulong operatorQqId, ulong groupId)
@@ -86,23 +83,23 @@ public class AudioService(
 
         string lastChance;
         AuditStatus status;
-        switch (user.Status )
-            {
-                case AuditStatus.Pending :
-                    status = AuditStatus.Suspend;
-                    lastChance = "您还有2次审核机会";
-                    break;
-                case AuditStatus.Suspend:
-                    status = AuditStatus.Dying;
-                    lastChance = "您还有1次审核机会";
-                    break;
-                case AuditStatus.Dying:
-                    status = AuditStatus.Denied;
-                    lastChance = "很抱歉，您的三次审核机会已用尽！";
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(user.Status));
-            }
+        switch (user.Status)
+        {
+            case AuditStatus.Pending:
+                status = AuditStatus.Suspend;
+                lastChance = "您还有2次审核机会";
+                break;
+            case AuditStatus.Suspend:
+                status = AuditStatus.Dying;
+                lastChance = "您还有1次审核机会";
+                break;
+            case AuditStatus.Dying:
+                status = AuditStatus.Denied;
+                lastChance = "很抱歉，您的三次审核机会已用尽！";
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(user.Status));
+        }
 
         if (status is AuditStatus.Denied)
         {

@@ -9,14 +9,16 @@ public class BotConfig
 
     [JsonPropertyName("AuditGroupId")]
     public ulong AuditGroupId { get; init; }
+
     [JsonPropertyName("MainGroupIds")]
     public List<ulong> MainGroupIds { get; init; } = [];
+
     [JsonPropertyName("AuditorQqIds")]
     public List<ulong> AuditorQqIds { get; init; } = [];
-    [JsonPropertyName("QuestionnaireLinks")]
-    public List<string> QuestionnaireLinks { get; init; } = [];
+
     [JsonPropertyName("AdminQqIds")]
     public List<ulong> AdminQqIds { get; init; } = [];
+
     [JsonPropertyName("DataFile")]
     public string DataFile { get; init; } = "bot_data.json";
 }

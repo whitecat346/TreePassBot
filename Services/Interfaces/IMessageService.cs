@@ -1,3 +1,5 @@
+using Makabaka.Models;
+
 namespace TreePassBot.Services.Interfaces;
 
 public interface IMessageService
@@ -6,4 +8,6 @@ public interface IMessageService
 
     [Obsolete]
     public Task SendPrivateMessageAsync(ulong userId, Makabaka.Messages.Message msg);
+
+    public Task<GroupMemberInfo?> GetGroupMemberInfo(ulong groupId, ulong userId);
 }

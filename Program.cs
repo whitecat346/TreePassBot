@@ -1,9 +1,11 @@
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using TreePassBot.Data;
 using TreePassBot.Handlers;
+using TreePassBot.Handlers.AdminCommands;
 using TreePassBot.Models;
 using TreePassBot.Services;
 using TreePassBot.Services.Interfaces;
@@ -11,7 +13,7 @@ using TreePassBot.Utils;
 
 namespace TreePassBot;
 #nullable disable
-internal class Program
+internal static class Program
 {
     public static IHost AppHost { get; private set; }
 
@@ -41,10 +43,14 @@ internal class Program
                     services.AddSingleton<JsonDataStore>();
 
                     services.AddScoped<IUserService, UserService>();
-                    services.AddScoped<IAuditService, AudioService>();
+                    services.AddScoped<IAuditService, AuditService>();
                     services.AddScoped<IMessageService, MessageService>();
 
                     services.AddSingleton<PasscodeGeneratorUtil>();
+
+                    services.AddCommandModules(Assembly.GetExecutingAssembly());
+
+                    services.AddSingleton<CommandDispatcher>();
 
                     services.AddSingleton<GroupMessageEventHandler>();
                     services.AddSingleton<GroupRequestEventHandler>();

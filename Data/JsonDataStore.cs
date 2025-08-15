@@ -196,6 +196,51 @@ public sealed class JsonDataStore : IDisposable
         }
     }
 
+    public void AddToBlackList(ulong qqId)
+    {
+        lock (Lock)
+        {
+            if (_disposed) return;
+            // 检查用户是否已存在
+            if (_data.BlackList.Contains(qqId))
+            {
+                return;
+            }
+
+            _data.BlackList.Add(qqId);
+            SaveChange();
+        }
+    }
+
+    public bool IsInBlackList(ulong qqId)
+    {
+        lock (Lock)
+        {
+            if (_disposed)
+            {
+                return false;
+            }
+
+            return _data.BlackList.Contains(qqId);
+        }
+    }
+
+    public void RemoveFromBlackList(ulong qqId)
+    {
+        lock (Lock)
+        {
+            if (_disposed) return;
+            // 检查用户是否在黑名单中
+            if (!_data.BlackList.Contains(qqId))
+            {
+                return;
+            }
+
+            _data.BlackList.Remove(qqId);
+            SaveChange();
+        }
+    }
+
     public bool UpdateUser(PendingUser user)
     {
         lock (Lock)

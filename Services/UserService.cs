@@ -78,4 +78,25 @@ public class UserService(
 
         return Task.CompletedTask;
     }
+
+    /// <inheritdoc />
+    public Task AddToBlackList(ulong qqId)
+    {
+        dataStore.AddToBlackList(qqId);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task<bool> IsInBlackList(ulong qqId)
+    {
+        var isBlack = dataStore.IsInBlackList(qqId);
+        return Task.FromResult(isBlack);
+    }
+
+    /// <inheritdoc />
+    public Task RemoveFromBlackList(ulong qqId)
+    {
+        dataStore.RemoveFromBlackList(qqId);
+        return Task.CompletedTask;
+    }
 }
