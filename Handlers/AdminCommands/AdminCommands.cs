@@ -1,3 +1,4 @@
+using System.Text;
 using Makabaka.Events;
 using Makabaka.Messages;
 using TreePassBot.Data;
@@ -49,17 +50,22 @@ public class AdminCommands(
             return true;
         }
 
-        var userInfo = $"查询用户: {user.QqId}\n" +
-                       $"状态: {user.Status}\n" +
-                       $"验证码: {(string.IsNullOrEmpty(user.Passcode) ? "无" : user.Passcode)}\n" +
-                       $"创建时间: {user.CreatedAt:yyyy-MM-dd HH:mm:ss} (UTC)\n" +
-                       $"更新时间: {user.UpdatedAt:yyyy-MM-dd HH:mm:ss} (UTC)";
+        var userInfo = new StringBuilder($"查询用户: {user.QqId}\n" +
+                                         $"状态: {user.Status}\n" +
+                                         $"验证码: {(string.IsNullOrEmpty(user.Passcode) ? "无" : user.Passcode)}\n" +
+                                         $"创建时间: {user.CreatedAt:yyyy-MM-dd HH:mm:ss} (UTC)\n" +
+                                         $"更新时间: {user.UpdatedAt:yyyy-MM-dd HH:mm:ss} (UTC)");
 
-        await e.ReplyAsync([new TextSegment(userInfo)]);
+        if (user.ExpriedAt != null)
+        {
+            userInfo.Append($"\n过期时间: {user.ExpriedAt:yyyy-MM-dd HH:mm:ss} (UTC)");
+        }
+
+        await e.ReplyAsync([new TextSegment(userInfo.ToString())]);
         return true;
     }
 
-    [BotCommand("addtest", Description = "添加用户到待审核列表", Usage = ".addtest [QQ号]")]
+    [BotCommand("add-user", Description = "添加用户到待审核列表", Usage = ".add-user [QQ号]")]
     [RequiredPremission(UserRoles.Auditor | UserRoles.BotAdmin | UserRoles.GroupAdmin)]
     public async Task<bool> AddUser(GroupMessageEventArgs e)
     {

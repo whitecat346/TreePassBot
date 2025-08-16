@@ -48,7 +48,7 @@ public class GroupRequestEventHandler(
             }
             else if (expriedPasscode)
             {
-                await e.RejectAsync("验证码以过期，请在审核群中@机器人刷新！");
+                await e.RejectAsync("验证码以过期，请重新申请审核！");
                 logger.LogInformation("User {qqId} 's passcode was expried.", e.UserId);
             }
             else

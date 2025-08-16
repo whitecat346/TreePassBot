@@ -22,6 +22,7 @@ public class QqBotService : IHostedService
 
     #region Helper Method
 
+    [Obsolete]
     private static Task OnPrivateMessageHelper(object sender, PrivateMessageEventArgs e)
     {
         var handler =

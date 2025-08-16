@@ -37,28 +37,33 @@ internal static class Program
                     .ReadFrom.Services(services)
                     .Enrich.FromLogContext())
                 .ConfigureServices(((hostContext, services) =>
-                {
-                    services.Configure<BotConfig>(hostContext.Configuration.GetSection("BotConfig"));
+                            {
+                                services
+                                    // Data Store
+                                   .Configure<BotConfig>(hostContext.Configuration.GetSection("BotConfig"))
+                                   .AddSingleton<JsonDataStore>()
 
-                    services.AddSingleton<JsonDataStore>();
+                                    // Services
+                                   .AddScoped<IUserService, UserService>()
+                                   .AddScoped<IAuditService, AuditService>()
+                                   .AddScoped<IMessageService, MessageService>()
 
-                    services.AddScoped<IUserService, UserService>();
-                    services.AddScoped<IAuditService, AuditService>();
-                    services.AddScoped<IMessageService, MessageService>();
+                                    // Command Dispatcher
+                                   .AddCommandModules(Assembly.GetExecutingAssembly())
+                                   .AddSingleton<CommandDispatcher>()
 
-                    services.AddSingleton<PasscodeGeneratorUtil>();
+                                    // Event Handlers
+                                   .AddSingleton<GroupMessageEventHandler>()
+                                   .AddSingleton<GroupRequestEventHandler>()
+                                   .AddSingleton<GroupMemberEventHandler>()
+                                   .AddSingleton<PrivateMessageEventHandler>()
 
-                    services.AddCommandModules(Assembly.GetExecutingAssembly());
+                                    // Utils
+                                   .AddSingleton<PasscodeGeneratorUtil>()
 
-                    services.AddSingleton<CommandDispatcher>();
-
-                    services.AddSingleton<GroupMessageEventHandler>();
-                    services.AddSingleton<GroupRequestEventHandler>();
-                    services.AddSingleton<GroupMemberEventHandler>();
-                    services.AddSingleton<PrivateMessageEventHandler>();
-
-                    services.AddHostedService<QqBotService>();
-                }))
+                                    // Host
+                                   .AddHostedService<QqBotService>();
+                            }))
                 .Build();
 
             Log.Information("QQBot host started successfully.");
