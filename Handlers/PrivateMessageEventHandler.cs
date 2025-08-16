@@ -1,4 +1,4 @@
-﻿using Makabaka.Events;
+using Makabaka.Events;
 using Makabaka.Messages;
 using Microsoft.Extensions.Logging;
 using TreePassBot.Data;
@@ -12,6 +12,7 @@ public class PrivateMessageEventHandler(
     PasscodeGeneratorUtil generator,
     ILogger<PrivateMessageEventHandler> logger)
 {
+    [Obsolete]
     public async Task HandlePrivateMessage(PrivateMessageEventArgs e)
     {
         var user = dataStore.GetUserByQqId(e.UserId);

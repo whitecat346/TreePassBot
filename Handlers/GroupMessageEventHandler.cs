@@ -52,20 +52,21 @@ public partial class GroupMessageEventHandler(
             return;
         }
 
-        if (e.Message[0] is AtSegment && e.Message.Count == 1)
-        {
-#if DEBUG
-            logger.LogInformation("Handle refresh passcode command: {msg}", msg);
-#endif
+        //        if (e.Message[0] is AtSegment && e.Message.Count == 1)
+        //        {
+        //#if DEBUG
+        //            logger.LogInformation("Handle refresh passcode command: {msg}", msg);
+        //#endif
 
-            await HandleRefreshPasscodeAsync(e);
-        }
+        //            await HandleRefreshPasscodeAsync(e);
+        //        }
 
 #if DEBUG
         logger.LogInformation("Do nothing.");
 #endif
     }
 
+    [Obsolete]
     private async Task HandleRefreshPasscodeAsync(GroupMessageEventArgs e)
     {
         var user = dataStore.GetUserByQqId(e.UserId);

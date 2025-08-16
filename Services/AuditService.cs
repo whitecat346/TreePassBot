@@ -26,12 +26,12 @@ public class AuditService(
             return false;
         }
 
-        if (user.Status is AuditStatus.Approved or AuditStatus.Expried)
+        if (user.Status is AuditStatus.Approved)
         {
             logger.LogError("Targe user: {TargetQqId} has been processed.", targetQqId);
 
             await messageService.SendGroupMessageAsync(groupId,
-                [new AtSegment(operatorQqId), new TextSegment("目标QQ号已被处理！")]);
+                                                       [new AtSegment(operatorQqId), new TextSegment("目标QQ号已被处理！")]);
 
             return false;
         }
@@ -47,7 +47,7 @@ public class AuditService(
             [
                 new AtSegment(targetQqId),
                 new TextSegment($"您的审核已通过！请在入群申请中填写以下验证码：{passcode}\n"),
-                new TextSegment("该验证码将在10分钟后过期，过期后可在此群聊中@机器人重新生成。\n"),
+                new TextSegment("该验证码将在10分钟后过期，过期后就要重新答题了，所以尽快使用。\n"),
                 new TextSegment("验证码与QQ号一一对应，不用再尝试其他人的验证码了 (～￣▽￣)～")
             ]);
         }
@@ -95,7 +95,7 @@ public class AuditService(
                 break;
             case AuditStatus.Dying:
                 status = AuditStatus.Denied;
-                lastChance = "很抱歉，您的三次审核机会已用尽！";
+                lastChance = "很抱歉，您的三次审核机会已用尽！\n因为一些未知的问题无法自动踢出群聊，请自行退出，否则待审核名单里没你的信息。";
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(user.Status));
