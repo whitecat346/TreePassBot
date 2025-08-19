@@ -123,8 +123,10 @@ public partial class GroupMessageEventHandler(
         try
         {
             var targetQqIds = targetQqIdStr.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                                           .SelectMany(it => it.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                                           .Where(it => !string.IsNullOrWhiteSpace(it))
                                            .Select(ulong.Parse)
-                                           .ToList();
+                                           .ToHashSet();
 
             var command = match.Groups[2].Value.ToLower();
 
