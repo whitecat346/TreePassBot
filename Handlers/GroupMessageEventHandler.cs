@@ -118,35 +118,75 @@ public partial class GroupMessageEventHandler(
             return;
         }
 
-        var targetQqId = ulong.Parse(match.Groups[1].Value);
+        var targetQqIdStr = match.Groups[1].Value;
 
-        var command = match.Groups[2].Value.ToLower();
-
-        if (command.Equals("pass", StringComparison.OrdinalIgnoreCase))
+        try
         {
-            var success = await auditService.ProcessApprovalAsync(targetQqId, e.UserId, e.GroupId);
+            var targetQqIds = targetQqIdStr.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                                           .Select(ulong.Parse)
+                                           .ToList();
 
-            if (success)
+            var command = match.Groups[2].Value.ToLower();
+
+            if (command.Equals("pass", StringComparison.OrdinalIgnoreCase))
             {
-                await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("已批准!")]);
+                List<ulong> failedQqIds = [];
+
+                foreach (var targetQqId in targetQqIds)
+                {
+                    var success = await auditService.ProcessApprovalAsync(targetQqId, e.UserId, e.GroupId);
+                    if (!success)
+                    {
+                        failedQqIds.Add(targetQqId);
+                    }
+                }
+
+                if (failedQqIds.Count == 0)
+                {
+                    await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("已通过所有指定用户的审核!")]);
+                }
+                else
+                {
+                    var failedQqIdStr = string.Join("\n", failedQqIds);
+                    await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"以下用户处理失败: {failedQqIdStr}")]);
+                }
+            }
+            else if (command.Equals("deny", StringComparison.OrdinalIgnoreCase))
+            {
+                List<ulong> failedQqIds = [];
+
+                foreach (var targetQqId in targetQqIds)
+                {
+                    var success = await auditService.ProcessDenialAsync(targetQqId, e.UserId, e.GroupId);
+                    if (!success)
+                    {
+                        failedQqIds.Add(targetQqId);
+                    }
+                }
+
+                if (failedQqIds.Count == 0)
+                {
+                    await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("已拒绝所有指定用户的审核!")]);
+                }
+                else
+                {
+                    var failedQqIdStr = string.Join("\n", failedQqIds);
+                    await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"以下用户处理失败: {failedQqIdStr}")]);
+                }
+            }
+            else
+            {
+                await e.ReplyAsync(
+                    [new AtSegment(e.UserId), new TextSegment("未知的命令，请使用 `pass` 或 `deny`。")]);
             }
         }
-        else if (command.Equals("deny", StringComparison.OrdinalIgnoreCase))
+        catch (Exception exception)
         {
-            var success = await auditService.ProcessDenialAsync(targetQqId, e.UserId, e.GroupId);
-
-            if (success)
-            {
-                await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("已拒绝!")]);
-            }
-        }
-        else
-        {
-            await e.ReplyAsync(
-                [new AtSegment(e.UserId), new TextSegment("未知的命令，请使用 `pass` 或 `deny`。")]);
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("在尝试转换字符串时发生了错误，你是不是输入了错误的QQ号呢？")]);
+            logger.LogError("Failed to convert string to ulong: {Msg}", exception.Message);
         }
     }
 
-    [GeneratedRegex(@"(\d+)\s+(pass|deny)$", RegexOptions.IgnoreCase, "zh-CN")]
+    [GeneratedRegex(@"((?:\d+\s+)+)(pass|deny)", RegexOptions.IgnoreCase, "zh-CN")]
     private static partial Regex AuditorCommandRegex();
 }

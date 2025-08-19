@@ -1,10 +1,9 @@
 using System.Text.Json;
-using System.Timers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TreePassBot.Data.Entities;
 using TreePassBot.Models;
-using Timer = System.Timers.Timer;
+using Timer = System.Threading.Timer;
 
 namespace TreePassBot.Data;
 
@@ -15,31 +14,32 @@ public sealed class JsonDataStore : IDisposable
     private static readonly object Lock = new();
     private volatile bool _disposed;
     private readonly ILogger<JsonDataStore> _logger;
-    private readonly Timer _timer = new(TimeSpan.TicksPerMinute);
+
+    private readonly AutoResetEvent _autoResetEvent = new(true);
+    private readonly Timer _timer;
 
     public JsonDataStore(IOptions<BotConfig> config, ILogger<JsonDataStore> logger)
     {
         _logger = logger;
         _filePath = config.Value.DataFile;
 
-        _timer.AutoReset = true;
-        _timer.Enabled = true;
-        _timer.Elapsed += ExprieTimeOutPasscode;
-
         // Load data first before starting timer
         _data = LoadData();
 
-        _timer.Start();
+        _timer = new Timer(ExpireTimeOutPasscode, _autoResetEvent, 100L, 1000L);
     }
 
-    private void ExprieTimeOutPasscode(object? sender, ElapsedEventArgs e)
+    private void ExpireTimeOutPasscode(object? state)
     {
         lock (Lock)
         {
-            foreach (var pendingUser in _data.Users.Where(pendingUser => pendingUser.ExpriedAt < DateTime.UtcNow))
+            foreach (var expringUser in _data.Users.Where(pendingUser =>
+                                                              pendingUser.ExpriedAt < DateTime.UtcNow &&
+                                                              pendingUser.Status is not AuditStatus.Expried))
             {
-                pendingUser.Status = AuditStatus.Expried;
-                pendingUser.Passcode = string.Empty;
+                _logger.LogInformation("Exprie user {UserId} at {Time}.", expringUser.QqId, DateTime.UtcNow);
+                expringUser.Status = AuditStatus.Expried;
+                expringUser.Passcode = string.Empty;
             }
 
             SaveChange();
@@ -69,7 +69,7 @@ public sealed class JsonDataStore : IDisposable
             catch (Exception ex)
             {
                 // 文件损坏时返回新实例而不是抛出异常
-                _logger.LogWarning($"Error loading data file {_filePath}: {ex.Message}");
+                _logger.LogWarning("Error when loading data file {FilePath}: {Message}", _filePath, ex.Message);
                 return new UserData();
             }
         }
@@ -100,7 +100,7 @@ public sealed class JsonDataStore : IDisposable
             catch (Exception ex)
             {
                 // 记录保存错误，但不抛出异常
-                _logger.LogWarning($"Error saving data to {_filePath}: {ex.Message}");
+                _logger.LogWarning("Error saving data to {FilePath}: {Message}", _filePath, ex.Message);
 
                 // 清理临时文件
                 try
@@ -290,14 +290,17 @@ public sealed class JsonDataStore : IDisposable
         {
             if (_disposed) return [];
 
-            return _data.Users.Select(u => new PendingUser
-            {
-                QqId = u.QqId,
-                Status = u.Status,
-                Passcode = u.Passcode,
-                CreatedAt = u.CreatedAt,
-                UpdatedAt = u.UpdatedAt
-            }).ToList();
+            return
+            [
+                .. _data.Users.Select(u => new PendingUser
+                {
+                    QqId = u.QqId,
+                    Status = u.Status,
+                    Passcode = u.Passcode,
+                    CreatedAt = u.CreatedAt,
+                    UpdatedAt = u.UpdatedAt
+                })
+            ];
         }
     }
 
@@ -324,7 +327,7 @@ public sealed class JsonDataStore : IDisposable
                 // 最后保存一次数据
                 try
                 {
-                    _timer.Stop();
+                    _timer.Dispose();
                     SaveChange();
                 }
                 catch

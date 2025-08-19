@@ -29,6 +29,13 @@ public class GroupRequestEventHandler(
 
     private async Task AuditGroupHandlerAsync(GroupAddRequestEventArgs e)
     {
+        if (await userService.IsInBlackList(e.UserId))
+        {
+            await e.RejectAsync("您在黑名单中，无法加入该群组！");
+            logger.LogInformation("User {qqId} is in the blacklist.", e.UserId);
+            return;
+        }
+
         await e.AcceptAsync();
         logger.LogInformation("New user {qqId} joined audit group {groupId}", e.UserId, e.GroupId);
     }

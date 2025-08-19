@@ -98,7 +98,7 @@ public class AuditService(
                 lastChance = "很抱歉，您的三次审核机会已用尽！\n因为一些未知的问题无法自动踢出群聊，请自行退出，否则待审核名单里没你的信息。";
                 break;
             default:
-                throw new ArgumentOutOfRangeException(nameof(user.Status));
+                throw new ArgumentOutOfRangeException("userStatus");
         }
 
         if (status is AuditStatus.Denied)

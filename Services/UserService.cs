@@ -34,6 +34,7 @@ public class UserService(
     /// <inheritdoc />
     public Task<PendingUser?> GetPendingUserAsync(ulong qqId)
     {
+        logger.LogInformation("Try to get user {QqId}.", qqId);
         return Task.FromResult(dataStore.GetUserByQqId(qqId));
     }
 
@@ -53,6 +54,8 @@ public class UserService(
         }
 
         dataStore.UpdateUser(user);
+
+        logger.LogInformation("Update user {QqId} status to {State}.", qqId, status);
         return Task.FromResult(true);
     }
 
@@ -65,6 +68,7 @@ public class UserService(
             throw new ArgumentNullException(nameof(user), "User not found in data store.");
         }
 
+        logger.LogInformation("Validate user {QqId}.", qqId);
         var rightPasscode = user.Passcode.Equals(passcode, StringComparison.OrdinalIgnoreCase);
         var expriedPassscode = user.Status == AuditStatus.Expried;
 
@@ -75,7 +79,7 @@ public class UserService(
     public Task DeleteUserAsync(ulong qqId)
     {
         dataStore.DeleteUser(qqId);
-
+        logger.LogInformation("Delete user {QqId} from audit list.", qqId);
         return Task.CompletedTask;
     }
 
@@ -83,6 +87,7 @@ public class UserService(
     public Task AddToBlackList(ulong qqId)
     {
         dataStore.AddToBlackList(qqId);
+        logger.LogInformation("Add user {QqId} to black list.", qqId);
         return Task.CompletedTask;
     }
 
@@ -90,6 +95,7 @@ public class UserService(
     public Task<bool> IsInBlackList(ulong qqId)
     {
         var isBlack = dataStore.IsInBlackList(qqId);
+        logger.LogInformation("Check user {QqId} whether in black list.", qqId);
         return Task.FromResult(isBlack);
     }
 
@@ -97,6 +103,7 @@ public class UserService(
     public Task RemoveFromBlackList(ulong qqId)
     {
         dataStore.RemoveFromBlackList(qqId);
+        logger.LogInformation("Remove user {QqId} from black list.", qqId);
         return Task.CompletedTask;
     }
 }

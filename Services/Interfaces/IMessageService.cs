@@ -4,10 +4,12 @@ namespace TreePassBot.Services.Interfaces;
 
 public interface IMessageService
 {
-    public Task SendGroupMessageAsync(ulong groupId, Makabaka.Messages.Message msg);
+    Task SendGroupMessageAsync(ulong groupId, Makabaka.Messages.Message msg);
 
-    [Obsolete]
-    public Task SendPrivateMessageAsync(ulong userId, Makabaka.Messages.Message msg);
+    [Obsolete("Cannot create temp room, so obsolete this method.")]
+    Task SendPrivateMessageAsync(ulong userId, Makabaka.Messages.Message msg);
 
-    public Task<GroupMemberInfo?> GetGroupMemberInfo(ulong groupId, ulong userId);
+    Task<GroupMemberInfo?> GetGroupMemberInfo(ulong groupId, ulong userId);
+
+    Task<GroupMemberInfo[]?> GetGroupMemberList(ulong groupId);
 }

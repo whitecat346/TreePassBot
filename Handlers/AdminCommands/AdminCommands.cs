@@ -1,23 +1,28 @@
 using System.Text;
 using Makabaka.Events;
 using Makabaka.Messages;
+using Makabaka.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TreePassBot.Data;
 using TreePassBot.Handlers.AdminCommands.Permission;
+using TreePassBot.Models;
 using TreePassBot.Services.Interfaces;
 
 namespace TreePassBot.Handlers.AdminCommands;
 
 public class AdminCommands(
     JsonDataStore dataStore,
-    IUserService userService)
+    IUserService userService,
+    IMessageService messageService,
+    ILogger<AdminCommands> logger,
+    IOptions<BotConfig> config)
 {
     [BotCommand("rand", Description = "生成一个随机验证码", Usage = ".rand")]
     [RequiredPremission(UserRoles.Auditor | UserRoles.BotAdmin | UserRoles.GroupAdmin)]
     public async Task<bool> RandomGeneration(GroupMessageEventArgs e)
     {
-        var passcode = new string(Enumerable.Range(0, 10)
-                                            .Select(_ => (char)Random.Shared.Next('0', '9' + 1))
-                                            .ToArray());
+        var passcode = new string([.. Enumerable.Range(0, 10).Select(_ => (char)Random.Shared.Next('0', '9' + 1))]);
 
         var isUnique = !dataStore.PasscodeExists(passcode);
 
@@ -154,6 +159,180 @@ public class AdminCommands(
 
         await userService.RemoveFromBlackList(qqToRemove);
         await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"成功将用户 {qqToRemove} 从黑名单中移除。")]);
+        return true;
+    }
+
+    [BotCommand("retake", Description = "将未在名单中的用户重新加入", Usage = ".retake")]
+    [RequiredPremission(UserRoles.Auditor | UserRoles.BotAdmin | UserRoles.GroupAdmin)]
+    public async Task<bool> RetakeUser(GroupMessageEventArgs e)
+    {
+        var targetGroupId = config.Value.AuditGroupId;
+
+        var userList = await messageService.GetGroupMemberList(targetGroupId);
+        if (userList == null)
+        {
+            logger.LogWarning("Failed to get group member list.");
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("无法获取用户列表，可能是该群组没有成员或发生了错误。")]);
+            return false;
+        }
+
+        var botConfig = config.Value;
+        HashSet<ulong> adminQqIds = [..botConfig.AdminQqIds, ..botConfig.AuditorQqIds, botConfig.BotQqId];
+
+        var withOutAdmin = userList
+                          .Where(user => user.Role is GroupRoleType.Member)
+                          .Where(user => !adminQqIds.Contains(user.UserId));
+
+        var existingUserIds = dataStore.GetAllUsers().Select(user => user.QqId).ToHashSet();
+        var notInList = withOutAdmin
+                       .Where(user => !existingUserIds.Contains(user.UserId))
+                       .Select(user => user.UserId)
+                       .ToList();
+
+        if (notInList.Count == 0)
+        {
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("没有用户需要重新加入。")]);
+            return true;
+        }
+
+        foreach (var userId in notInList)
+        {
+            await userService.AddPendingUserAsync(userId);
+        }
+
+        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"共有{notInList.Count}个用户被重新加入。")]);
+
+        return true;
+    }
+
+    [BotCommand("list-duplicated", Description = "列出已在大群的用户", Usage = ".list-duplicated")]
+    [RequiredPremission(UserRoles.Auditor | UserRoles.BotAdmin | UserRoles.GroupAdmin)]
+    public async Task<bool> ListDuplicatedUsers(GroupMessageEventArgs e)
+    {
+        var botConfig = config.Value;
+
+        var targetGroupIds = botConfig.MainGroupIds;
+        var tasks = targetGroupIds.Select(async groupId =>
+        {
+            var members = await messageService.GetGroupMemberList(groupId);
+            if (members == null)
+            {
+                logger.LogWarning("Failed to get group {GroupId} member list info.", groupId);
+                return Enumerable.Empty<GroupMemberInfo>();
+            }
+
+            return members;
+        }).ToList();
+
+        // 并发等待所有任务完成
+        var results = await Task.WhenAll(tasks);
+
+        // 将所有结果合并到一个列表中
+        var mainUsers = results.SelectMany(x => x).ToList();
+
+        if (mainUsers.Count == 0)
+        {
+            logger.LogWarning("Failed to get group group member list.");
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("获取用户列表时失败。")]);
+            return false;
+        }
+
+        var auditUsers = await messageService.GetGroupMemberList(botConfig.AuditGroupId);
+        if (auditUsers == null)
+        {
+            logger.LogWarning("Failed to get audit group member list.");
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("无法获取审核群组的用户列表。")]);
+            return false;
+        }
+
+
+        HashSet<ulong> adminQqIds = [..botConfig.AdminQqIds, ..botConfig.AuditorQqIds, botConfig.BotQqId];
+
+        var auditGroupUserDict = auditUsers
+                                .Where(user => user.Role is GroupRoleType.Member)
+                                .Where(user => !adminQqIds.Contains(user.UserId))
+                                .ToDictionary(user => user.UserId);
+
+        var mainGroupUserIds = mainUsers.Select(user => user.UserId).ToHashSet();
+
+        var duplicatedUserIds = auditGroupUserDict.Keys.Where(id => mainGroupUserIds.Contains(id)).ToList();
+
+        if (duplicatedUserIds.Count == 0)
+        {
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("没有找到重复的用户。")]);
+            return true;
+        }
+
+        var response = new StringBuilder("以下已在大群的用户仍在审核列表中:\n");
+        foreach (var userId in duplicatedUserIds)
+        {
+            var userInfo = auditGroupUserDict[userId];
+            response.AppendLine($"{userInfo.Nickname} - {userInfo.UserId}");
+        }
+
+        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment(response.ToString())]);
+        return true;
+    }
+
+    [BotCommand("rm-unexist", Description = "移除不存在的用户", Usage = ".rm-unexist")]
+    [RequiredPremission(UserRoles.Auditor | UserRoles.BotAdmin | UserRoles.GroupAdmin)]
+    public async Task<bool> RemoveUnexistUsers(GroupMessageEventArgs e)
+    {
+        var botConfig = config.Value;
+
+        var existUsersResponse = await messageService.GetGroupMemberList(botConfig.AuditGroupId);
+        if (existUsersResponse == null)
+        {
+            logger.LogWarning("Failed to get audit group member list.");
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("无法获取审核群组的用户列表。")]);
+            return false;
+        }
+
+        HashSet<ulong> adminQqIds = [..botConfig.AdminQqIds, ..botConfig.AuditorQqIds, botConfig.BotQqId];
+
+        var existUserIds = existUsersResponse
+                          .Where(user => user.Role is GroupRoleType.Member)
+                          .Where(user => !adminQqIds.Contains(user.UserId))
+                          .Select(user => user.UserId)
+                          .ToHashSet();
+
+        var inPendingListUsers = dataStore.GetAllUsers()
+                                          .Select(user => user.QqId)
+                                          .ToHashSet();
+
+        var notInListUsers = inPendingListUsers.Where(id => !existUserIds.Contains(id)).ToList();
+
+        if (notInListUsers.Count == 0)
+        {
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("没有需要移除的用户。")]);
+            return true;
+        }
+
+        foreach (var userId in notInListUsers)
+        {
+            await userService.DeleteUserAsync(userId);
+        }
+
+        await e.ReplyAsync([
+            new AtSegment(e.UserId),
+            new TextSegment($"操作完成，已从待审核列表中移除了 {notInListUsers.Count} 名不存在的用户。")
+        ]);
+
+        return true;
+    }
+
+    [BotCommand("rm-user", Description = "从名单中移除指定的用户", Usage = ".rm-user [QQ号]")]
+    [RequiredPremission(UserRoles.Auditor | UserRoles.BotAdmin | UserRoles.GroupAdmin)]
+    public async Task<bool> RemoveUser(GroupMessageEventArgs e)
+    {
+        var spilied = e.Message.ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (spilied.Length < 2 || !ulong.TryParse(spilied[1], out var qqToRemove))
+        {
+            return false;
+        }
+
+        await userService.DeleteUserAsync(qqToRemove);
+        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("成功将指定的用户从名单中移除！")]);
         return true;
     }
 }
