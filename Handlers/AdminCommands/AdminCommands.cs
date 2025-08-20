@@ -2,9 +2,11 @@ using System.Text;
 using Makabaka.Events;
 using Makabaka.Messages;
 using Makabaka.Models;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TreePassBot.Data;
+using TreePassBot.Data.Entities;
 using TreePassBot.Handlers.AdminCommands.Permission;
 using TreePassBot.Models;
 using TreePassBot.Services.Interfaces;
@@ -271,6 +273,22 @@ public class AdminCommands(
         }
 
         await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment(response.ToString())]);
+        return true;
+    }
+
+    [BotCommand("list-expired", Description = "列出验证码过期的用户", Usage = ".list-expired")]
+    [RequiredPremission(UserRoles.Auditor | UserRoles.BotAdmin | UserRoles.GroupAdmin)]
+    public async Task<bool> ListExpired(GroupMessageEventArgs e)
+    {
+        var users = dataStore.GetAllUsers();
+        var expiredUsers = users.Where(user => user.Status is AuditStatus.Expried).ToList();
+        var sb = new StringBuilder("以下用户的审核已过期：\n");
+        foreach (var user in expiredUsers)
+        {
+            sb.AppendLine($"{user.QqId}\n");
+        }
+
+        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment(sb.ToString())]);
         return true;
     }
 

@@ -34,10 +34,10 @@ public sealed class JsonDataStore : IDisposable
         lock (Lock)
         {
             foreach (var expringUser in _data.Users.Where(pendingUser =>
-                                                              pendingUser.ExpriedAt < DateTime.UtcNow &&
-                                                              pendingUser.Status is not AuditStatus.Expried))
+                                                              pendingUser.Status is not AuditStatus.Expried &&
+                                                              pendingUser.ExpriedAt < DateTime.UtcNow))
             {
-                _logger.LogInformation("Exprie user {UserId} at {Time}.", expringUser.QqId, DateTime.UtcNow);
+                _logger.LogInformation("Expire user {UserId} at {Time}.", expringUser.QqId, DateTime.UtcNow);
                 expringUser.Status = AuditStatus.Expried;
                 expringUser.Passcode = string.Empty;
             }

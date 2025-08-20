@@ -42,15 +42,11 @@ public partial class GroupMessageEventHandler(
             return;
         }
 
-        if (_config.AdminQqIds.Contains(e.UserId) && msg.StartsWith('.'))
-        {
 #if DEBUG
-            logger.LogInformation("Handle admin command: {msg}", msg);
+        logger.LogInformation("Handle admin command: {msg}", msg);
 #endif
 
-            await HandleAdminCommandAsync(e);
-            return;
-        }
+        await HandleAdminCommandAsync(e);
 
         //        if (e.Message[0] is AtSegment && e.Message.Count == 1)
         //        {
@@ -102,11 +98,6 @@ public partial class GroupMessageEventHandler(
 
     private async Task HandleAuditorCommandAsync(GroupMessageEventArgs e)
     {
-        if (e.Message[0] is not AtSegment)
-        {
-            return;
-        }
-
         if (_config.AuditGroupId != e.GroupId)
         {
             return;

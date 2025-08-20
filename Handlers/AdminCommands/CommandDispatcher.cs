@@ -105,44 +105,48 @@ public class CommandDispatcher
 
         var commandName = parts[0].ToLowerInvariant();
 
-        if (_commands.TryGetValue(commandName, out var commandInfo))
-        {
-            if (!IsExecutable(e, commandInfo.Roles))
-            {
-                _logger.LogInformation("Un-executable command {Name} issued.", commandName);
-                return;
-            }
-
-            using var scoop = _serviceProvider.CreateScope();
-            try
-            {
-                var moduleInstance = scoop.ServiceProvider.GetRequiredService(commandInfo.ModuleType);
-
-                var task = (Task<bool>?)commandInfo.Method.Invoke(moduleInstance, [e]);
-                if (task != null)
-                {
-                    var result = await task;
-
-                    if (result == false)
-                    {
-                        await e.ReplyAsync([
-                            new AtSegment(e.UserId), new TextSegment("命令执行失败\n使用方法："),
-                            new TextSegment(commandInfo.Attribute.Usage)
-                        ]);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("Failed to execute command {Name} {Message}",
-                                 commandName,
-                                 ex.InnerException?.Message ?? ex.Message);
-            }
-        }
-        else
+        if (!_commands.TryGetValue(commandName, out var commandInfo))
         {
             await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("未知命令："), new TextSegment(commandName)]);
             _logger.LogWarning("Command {Command} not found.", commandName);
+
+            return;
+        }
+
+        _logger.LogInformation("User {ID} try to issue command {Name}.", e.UserId, commandName);
+
+        if (!IsExecutable(e, commandInfo.Roles))
+        {
+            _logger.LogInformation("Un-executable command {Name} issued.", commandName);
+            return;
+        }
+
+        _logger.LogInformation("Execute command {Name} by {UserId}.", commandName, e.UserId);
+
+        using var scoop = _serviceProvider.CreateScope();
+        try
+        {
+            var moduleInstance = scoop.ServiceProvider.GetRequiredService(commandInfo.ModuleType);
+
+            var task = (Task<bool>?)commandInfo.Method.Invoke(moduleInstance, [e]);
+            if (task != null)
+            {
+                var result = await task;
+
+                if (result == false)
+                {
+                    await e.ReplyAsync([
+                        new AtSegment(e.UserId), new TextSegment("命令执行失败\n使用方法："),
+                        new TextSegment(commandInfo.Attribute.Usage)
+                    ]);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to execute command {Name} {Message}",
+                             commandName,
+                             ex.InnerException?.Message ?? ex.Message);
         }
     }
 
