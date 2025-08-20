@@ -48,4 +48,11 @@ public class MessageService(ILogger<MessageService> logger) : IMessageService
             return null;
         }
     }
+
+    public async Task KickGroupMemberAsync(ulong groupId, ulong userId)
+    {
+        logger.LogInformation("Try to kick member {UserId} from group {GroupId}.", userId, groupId);
+        var response = await QqBotService.MakabakaApp.BotContext.KickGroupMemberAsync(groupId, userId);
+        response.EnsureSuccess();
+    }
 }

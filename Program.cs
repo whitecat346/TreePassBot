@@ -32,11 +32,12 @@ internal static class Program
             Log.Information("Starting QQBot host...");
 
             var host = Host.CreateDefaultBuilder(InArgs)
-                .UseSerilog((context, services, configration) => configration
-                    .ReadFrom.Configuration(context.Configuration)
-                    .ReadFrom.Services(services)
-                    .Enrich.FromLogContext())
-                .ConfigureServices(((hostContext, services) =>
+                           .UseSerilog((context, services, configuration) =>
+                                           configuration
+                                              .ReadFrom.Configuration(context.Configuration)
+                                              .ReadFrom.Services(services)
+                                              .Enrich.FromLogContext())
+                           .ConfigureServices(((hostContext, services) =>
                             {
                                 services
                                     // Data Store
@@ -60,11 +61,12 @@ internal static class Program
 
                                     // Utils
                                    .AddSingleton<PasscodeGeneratorUtil>()
+                                   .AddSingleton<ArgumentsSpiliterUtil>()
 
                                     // Host
                                    .AddHostedService<QqBotService>();
                             }))
-                .Build();
+                           .Build();
 
             Log.Information("QQBot host started successfully.");
 

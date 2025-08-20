@@ -2,16 +2,16 @@ using System.Text;
 using Makabaka.Events;
 using Makabaka.Messages;
 using Makabaka.Models;
-using Microsoft.AspNetCore.Cors;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TreePassBot.Data;
 using TreePassBot.Data.Entities;
+using TreePassBot.Handlers.AdminCommands.Data;
 using TreePassBot.Handlers.AdminCommands.Permission;
 using TreePassBot.Models;
 using TreePassBot.Services.Interfaces;
 
-namespace TreePassBot.Handlers.AdminCommands;
+namespace TreePassBot.Handlers.AdminCommands.Commands;
 
 public class AdminCommands(
     JsonDataStore dataStore,
@@ -65,7 +65,7 @@ public class AdminCommands(
 
         if (user.ExpriedAt != null)
         {
-            userInfo.Append($"\n过期时间: {user.ExpriedAt:yyyy-MM-dd HH:mm:ss} (UTC)");
+            userInfo.AppendLine($"过期时间: {user.ExpriedAt:yyyy-MM-dd HH:mm:ss} (UTC)");
         }
 
         await e.ReplyAsync([new TextSegment(userInfo.ToString())]);
@@ -217,13 +217,13 @@ public class AdminCommands(
         var tasks = targetGroupIds.Select(async groupId =>
         {
             var members = await messageService.GetGroupMemberList(groupId);
-            if (members == null)
+            if (members != null)
             {
-                logger.LogWarning("Failed to get group {GroupId} member list info.", groupId);
-                return Enumerable.Empty<GroupMemberInfo>();
+                return members;
             }
 
-            return members;
+            logger.LogWarning("Failed to get group {GroupId} member list info.", groupId);
+            return Enumerable.Empty<GroupMemberInfo>();
         }).ToList();
 
         // 并发等待所有任务完成
@@ -281,7 +281,7 @@ public class AdminCommands(
     public async Task<bool> ListExpired(GroupMessageEventArgs e)
     {
         var users = dataStore.GetAllUsers();
-        var expiredUsers = users.Where(user => user.Status is AuditStatus.Expried).ToList();
+        var expiredUsers = users.Where(user => user.Status is AuditStatus.Expired).ToList();
         var sb = new StringBuilder("以下用户的审核已过期：\n");
         foreach (var user in expiredUsers)
         {

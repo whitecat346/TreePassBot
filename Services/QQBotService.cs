@@ -3,6 +3,8 @@ using Makabaka.Events;
 using Microsoft.Extensions.Hosting;
 using TreePassBot.Handlers;
 
+// ReSharper disable InconsistentNaming
+
 namespace TreePassBot.Services;
 
 public class QqBotService : IHostedService
@@ -15,46 +17,49 @@ public class QqBotService : IHostedService
         MakabakaApp.BotContext.OnGroupMessage += OnGroupMessageHelper;
         MakabakaApp.BotContext.OnGroupMemberIncrease += OnGroupMemberIncreaseHelper;
         MakabakaApp.BotContext.OnGroupMemberDecrease += OnGroupMemberDecreaseHelper;
-        //MakabakaApp.BotContext.OnPrivateMessage += OnPrivateMessageHelper;
+        MakabakaApp.BotContext.OnPrivateMessage += OnPrivateMessageHelper;
 
         await MakabakaApp.StartAsync(ct);
     }
 
     #region Helper Method
 
-    [Obsolete]
+    private static readonly PrivateMessageEventHandler _privateMessageEventHandler =
+        (PrivateMessageEventHandler)Program.AppHost.Services.GetService(typeof(PrivateMessageEventHandler))!;
+
+    private static readonly GroupMemberEventHandler _groupMemberEventHandler =
+        (GroupMemberEventHandler)Program.AppHost.Services.GetService(typeof(GroupMemberEventHandler))!;
+
+    private static readonly GroupRequestEventHandler _groupRequestEventHandler =
+        (GroupRequestEventHandler)Program.AppHost.Services.GetService(typeof(GroupRequestEventHandler))!;
+
+    private static readonly GroupMessageEventHandler _groupMessageEventHandler =
+        (GroupMessageEventHandler)Program.AppHost.Services.GetService(typeof(GroupMessageEventHandler))!;
+
     private static Task OnPrivateMessageHelper(object sender, PrivateMessageEventArgs e)
     {
-        var handler =
-            (PrivateMessageEventHandler)Program.AppHost.Services.GetService(typeof(PrivateMessageEventHandler))!;
-        return handler.HandlePrivateMessage(e);
+        return _privateMessageEventHandler.HandlePrivateMessage(e);
     }
 
     private static Task OnGroupMemberIncreaseHelper(object sender, GroupMemberIncreaseEventArgs e)
+
     {
-        var handler =
-            (GroupMemberEventHandler)Program.AppHost.Services.GetService(typeof(GroupMemberEventHandler))!;
-        return handler.HandleGroupMemberIncrease(e);
+        return _groupMemberEventHandler.HandleGroupMemberIncrease(e);
     }
 
     private static Task OnGroupMemberDecreaseHelper(object sender, GroupMemberDecreaseEventArgs e)
     {
-        var handler =
-            (GroupMemberEventHandler)Program.AppHost.Services.GetService(typeof(GroupMemberEventHandler))!;
-        return handler.HandleGroupMemberDecrease(e);
+        return _groupMemberEventHandler.HandleGroupMemberDecrease(e);
     }
 
     private static Task OnGroupAddRequestHelper(object sender, GroupAddRequestEventArgs e)
     {
-        var handler = (GroupRequestEventHandler)Program.AppHost.Services.GetService(typeof(GroupRequestEventHandler))!;
-        return handler.HandleAddRequest(e);
+        return _groupRequestEventHandler.HandleAddRequest(e);
     }
 
     private static Task OnGroupMessageHelper(object sender, GroupMessageEventArgs e)
     {
-        var handler =
-            (GroupMessageEventHandler)Program.AppHost.Services.GetService(typeof(GroupMessageEventHandler))!;
-        return handler.HandleGroupMessage(e);
+        return _groupMessageEventHandler.HandleGroupMessage(e);
     }
 
     #endregion

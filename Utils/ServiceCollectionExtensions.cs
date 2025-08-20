@@ -1,6 +1,6 @@
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
-using TreePassBot.Handlers.AdminCommands;
+using TreePassBot.Handlers.AdminCommands.Data;
 
 namespace TreePassBot.Utils;
 

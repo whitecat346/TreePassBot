@@ -1,4 +1,4 @@
-namespace TreePassBot.Handlers.AdminCommands;
+namespace TreePassBot.Handlers.AdminCommands.Data;
 
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
 public sealed class BotCommand(string name) : Attribute
@@ -11,7 +11,7 @@ public sealed class BotCommand(string name) : Attribute
     /// <summary>
     /// Command description.
     /// </summary>
-    public string Description { get; set; } = "None";
+    public string Description { get; set; } = string.Empty;
 
     /// <summary>
     /// How to use the command.

@@ -1,9 +1,10 @@
 using System.Text;
 using Makabaka.Events;
 using Makabaka.Messages;
+using TreePassBot.Handlers.AdminCommands.Data;
 using TreePassBot.Handlers.AdminCommands.Permission;
 
-namespace TreePassBot.Handlers.AdminCommands;
+namespace TreePassBot.Handlers.AdminCommands.Commands;
 
 public class HelpCommands(CommandDispatcher dispatcher)
 {

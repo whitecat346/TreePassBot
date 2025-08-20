@@ -71,12 +71,12 @@ public class AuditService(
             return false;
         }
 
-        if (user.Status is AuditStatus.Approved or AuditStatus.Expried)
+        if (user.Status is AuditStatus.Approved or AuditStatus.Expired)
         {
             logger.LogError("Targe user: {TargetQqId} has been processed.", targetQqId);
 
             await messageService.SendGroupMessageAsync(groupId,
-                [new AtSegment(operatorQqId), new TextSegment("目标QQ号已被处理！")]);
+                                                       [new AtSegment(operatorQqId), new TextSegment("目标QQ号已被处理！")]);
 
             return false;
         }
@@ -98,16 +98,15 @@ public class AuditService(
                 lastChance = "很抱歉，您的三次审核机会已用尽！\n因为一些未知的问题无法自动踢出群聊，请自行退出，否则待审核名单里没你的信息。";
                 break;
             default:
-                throw new ArgumentOutOfRangeException("userStatus");
+                throw new ArgumentOutOfRangeException(nameof(user.Status));
         }
 
         if (status is AuditStatus.Denied)
         {
             await messageService.SendGroupMessageAsync(groupId,
                 [new AtSegment(targetQqId), new TextSegment(lastChance)]);
-            var apiResponse = await QqBotService.MakabakaApp.BotContext.KickGroupMemberAsync(groupId, targetQqId);
 
-            logger.LogInformation("Kick group member response: {response}", apiResponse.Status);
+            await messageService.KickGroupMemberAsync(groupId, targetQqId);
 
             // unsure whether kick cause GroupMemberDecrease event
             // and which will cause delete user event in this program.

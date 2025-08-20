@@ -1,7 +1,7 @@
 using System.Reflection;
 using TreePassBot.Handlers.AdminCommands.Permission;
 
-namespace TreePassBot.Handlers.AdminCommands;
+namespace TreePassBot.Handlers.AdminCommands.Data;
 
 public class CommandInfo(MethodInfo method, Type moduleType, BotCommand attribute, UserRoles roles)
 {

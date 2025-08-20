@@ -18,7 +18,7 @@ public class UserService(
             return Task.FromResult(true); // 认为是成功，因为目标状态（用户在列表里）已达成
         }
 
-        var newUser = new PendingUser
+        var newUser = new UserInfo
         {
             QqId = qqId,
             Status = AuditStatus.Pending,
@@ -32,7 +32,7 @@ public class UserService(
     }
 
     /// <inheritdoc />
-    public Task<PendingUser?> GetPendingUserAsync(ulong qqId)
+    public Task<UserInfo?> GetPendingUserAsync(ulong qqId)
     {
         logger.LogInformation("Try to get user {QqId}.", qqId);
         return Task.FromResult(dataStore.GetUserByQqId(qqId));
@@ -48,7 +48,7 @@ public class UserService(
         user.Passcode = passcode;
         user.UpdatedAt = DateTime.UtcNow;
 
-        if (status is AuditStatus.Approved or AuditStatus.Expried)
+        if (status is AuditStatus.Approved or AuditStatus.Expired)
         {
             user.ExpriedAt = DateTime.UtcNow + TimeSpan.FromMinutes(10);
         }
@@ -70,7 +70,7 @@ public class UserService(
 
         logger.LogInformation("Validate user {QqId}.", qqId);
         var rightPasscode = user.Passcode.Equals(passcode, StringComparison.OrdinalIgnoreCase);
-        var expriedPassscode = user.Status == AuditStatus.Expried;
+        var expriedPassscode = user.Status == AuditStatus.Expired;
 
         return Task.FromResult((rightPasscode, expriedPassscode));
     }

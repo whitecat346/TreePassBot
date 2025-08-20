@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -10,333 +11,479 @@ namespace TreePassBot.Data;
 public sealed class JsonDataStore : IDisposable
 {
     private readonly string _filePath;
-    private readonly UserData _data;
-    private static readonly object Lock = new();
-    private volatile bool _disposed;
     private readonly ILogger<JsonDataStore> _logger;
 
-    private readonly AutoResetEvent _autoResetEvent = new(true);
-    private readonly Timer _timer;
+    // 使用读写锁替代全局锁，提高并发读取性能
+    private readonly ReaderWriterLockSlim _rwLock = new();
+
+    // 内存中的数据缓存，使用线程安全的集合
+    private readonly ConcurrentDictionary<ulong, UserInfo> _users = new();
+    private readonly ConcurrentHashSet<ulong> _blackList = new();
+
+    // 用于批量写入的变更跟踪
+    private readonly ConcurrentQueue<DataChange> _pendingChanges = new();
+    private volatile bool _hasChanges;
+
+    // 定时器和控制
+    private readonly Timer _expireTimer;
+    private readonly Timer _saveTimer;
+    private volatile bool _disposed;
+    private readonly SemaphoreSlim _saveSemaphore = new(1, 1);
+
+    // 配置参数
+    private readonly TimeSpan _saveInterval = TimeSpan.FromSeconds(5);    // 批量保存间隔
+    private readonly TimeSpan _expireInterval = TimeSpan.FromSeconds(10); // 过期检查间隔
 
     public JsonDataStore(IOptions<BotConfig> config, ILogger<JsonDataStore> logger)
     {
         _logger = logger;
         _filePath = config.Value.DataFile;
 
-        // Load data first before starting timer
-        _data = LoadData();
+        // 初始加载数据
+        LoadDataAsync().GetAwaiter().GetResult();
 
-        _timer = new Timer(ExpireTimeOutPasscode, _autoResetEvent, 100L, 1000L);
+        // 启动定时器
+        _expireTimer = new Timer(ExpireTimeOutPasscode, null, _expireInterval, _expireInterval);
+        _saveTimer = new Timer(SaveChangesIfNeeded, null, _saveInterval, _saveInterval);
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            if (!File.Exists(_filePath))
+            {
+                return;
+            }
+
+            var json = await File.ReadAllTextAsync(_filePath).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return;
+            }
+
+            if (JsonSerializer.Deserialize(json, typeof(UserData), UserDataContext.Default) is UserData userData)
+            {
+                // 加载到内存缓存
+                foreach (var user in userData.Users)
+                {
+                    _users.TryAdd(user.QqId, user);
+                }
+
+                foreach (var blackUserId in userData.BlackList)
+                {
+                    _blackList.Add(blackUserId);
+                }
+            }
+
+            _logger.LogInformation("Loaded {UserCount} users and {BlackListCount} blacklisted users",
+                                   _users.Count, _blackList.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Error loading data file {FilePath}: {Message}", _filePath, ex.Message);
+        }
     }
 
     private void ExpireTimeOutPasscode(object? state)
     {
-        lock (Lock)
+        if (_disposed) return;
+
+        var currentTime = DateTime.UtcNow;
+        var expiredUsers = new List<UserInfo>();
+
+        // 使用读锁检查过期用户
+        _rwLock.EnterReadLock();
+        try
         {
-            foreach (var expringUser in _data.Users.Where(pendingUser =>
-                                                              pendingUser.Status is not AuditStatus.Expried &&
-                                                              pendingUser.ExpriedAt < DateTime.UtcNow))
+            foreach (var kvp in _users)
             {
-                _logger.LogInformation("Expire user {UserId} at {Time}.", expringUser.QqId, DateTime.UtcNow);
-                expringUser.Status = AuditStatus.Expried;
-                expringUser.Passcode = string.Empty;
-            }
-
-            SaveChange();
-        }
-    }
-
-    private UserData LoadData()
-    {
-        lock (Lock)
-        {
-            try
-            {
-                if (!File.Exists(_filePath))
+                var user = kvp.Value;
+                if (user.Status != AuditStatus.Expired && user.ExpriedAt < currentTime)
                 {
-                    return new UserData();
+                    expiredUsers.Add(user);
                 }
-
-                var json = File.ReadAllText(_filePath);
-                if (string.IsNullOrWhiteSpace(json))
-                {
-                    return new UserData();
-                }
-
-                return JsonSerializer.Deserialize(json, typeof(UserData), UserDataContext.Default) as UserData
-                       ?? new UserData();
-            }
-            catch (Exception ex)
-            {
-                // 文件损坏时返回新实例而不是抛出异常
-                _logger.LogWarning("Error when loading data file {FilePath}: {Message}", _filePath, ex.Message);
-                return new UserData();
             }
         }
-    }
-
-    private void SaveChange()
-    {
-        lock (Lock)
+        finally
         {
-            if (_disposed) return;
+            _rwLock.ExitReadLock();
+        }
 
-            try
+        // 批量更新过期用户
+        if (expiredUsers.Count <= 0) return;
+
+        _rwLock.EnterWriteLock();
+        try
+        {
+            foreach (var user in expiredUsers)
             {
-                // 创建目录（如果不存在）
-                var directory = Path.GetDirectoryName(_filePath);
-                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                if (_users.TryGetValue(user.QqId, out var currentUser) &&
+                    currentUser.Status != AuditStatus.Expired &&
+                    currentUser.ExpriedAt < currentTime)
                 {
-                    Directory.CreateDirectory(directory);
-                }
+                    currentUser.Status = AuditStatus.Expired;
+                    currentUser.Passcode = string.Empty;
+                    currentUser.UpdatedAt = currentTime;
 
-                var json = JsonSerializer.Serialize(_data, typeof(UserData), UserDataContext.Default);
-
-                // 原子写入：先写入临时文件，然后移动到目标文件
-                var tempPath = _filePath + ".tmp";
-                File.WriteAllText(tempPath, json);
-                File.Move(tempPath, _filePath, true);
-            }
-            catch (Exception ex)
-            {
-                // 记录保存错误，但不抛出异常
-                _logger.LogWarning("Error saving data to {FilePath}: {Message}", _filePath, ex.Message);
-
-                // 清理临时文件
-                try
-                {
-                    var tempPath = _filePath + ".tmp";
-                    if (File.Exists(tempPath))
+                    _pendingChanges.Enqueue(new DataChange
                     {
-                        File.Delete(tempPath);
-                    }
-                }
-                catch
-                {
-                    // 忽略清理错误
+                        Type = ChangeType.Update,
+                        User = currentUser
+                    });
+
+                    _logger.LogInformation("Expired user {UserId} at {Time}", user.QqId, currentTime);
                 }
             }
+
+            _hasChanges = true;
+        }
+        finally
+        {
+            _rwLock.ExitWriteLock();
         }
     }
 
-    public PendingUser? GetUserByQqId(ulong qqId)
+    private void SaveChangesIfNeeded(object? state)
     {
-        lock (Lock)
+        if (_disposed || !_hasChanges) return;
+
+        _ = SaveChangesAsync();
+    }
+
+    private async Task SaveChangesAsync()
+    {
+        if (!await _saveSemaphore.WaitAsync(100).ConfigureAwait(false))
+            return;
+
+        try
         {
-            if (_disposed) return null;
+            if (_disposed || !_hasChanges) return;
 
-            // 返回副本以避免外部修改影响内部数据
-            var user = _data.Users.FirstOrDefault(u => u.QqId == qqId);
-            if (user == null) return null;
-
-            // 创建用户对象的副本
-            return new PendingUser
+            _rwLock.EnterReadLock();
+            UserData userData;
+            try
             {
-                QqId = user.QqId,
-                Status = user.Status,
-                Passcode = user.Passcode,
-                CreatedAt = user.CreatedAt,
-                UpdatedAt = user.UpdatedAt,
-                ExpriedAt = user.ExpriedAt
-            };
+                userData = new UserData
+                {
+                    Users = _users.Values.ToList(),
+                    BlackList = _blackList.ToList()
+                };
+            }
+            finally
+            {
+                _rwLock.ExitReadLock();
+            }
+
+            var directory = Path.GetDirectoryName(_filePath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            var json = JsonSerializer.Serialize(userData, typeof(UserData), UserDataContext.Default);
+
+            // 原子写入
+            var tempPath = _filePath + ".tmp";
+            await File.WriteAllTextAsync(tempPath, json).ConfigureAwait(false);
+            File.Move(tempPath, _filePath, true);
+
+            _hasChanges = false;
+
+            // 清空变更队列
+            while (_pendingChanges.TryDequeue(out _))
+            {
+            }
+
+            _logger.LogDebug("Data saved successfully to {FilePath}", _filePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Error saving data to {FilePath}: {Message}", _filePath, ex.Message);
+
+            try
+            {
+                var tempPath = _filePath + ".tmp";
+                if (File.Exists(tempPath))
+                {
+                    File.Delete(tempPath);
+                }
+            }
+            catch
+            {
+                // ignored
+            }
+        }
+        finally
+        {
+            _saveSemaphore.Release();
+        }
+    }
+
+    public UserInfo? GetUserByQqId(ulong qqId)
+    {
+        if (_disposed) return null;
+
+        _rwLock.EnterReadLock();
+        try
+        {
+            return _users.TryGetValue(qqId, out var user) ? CloneUser(user) : null;
+        }
+        finally
+        {
+            _rwLock.ExitReadLock();
         }
     }
 
     public bool UserExists(ulong qqId)
     {
-        lock (Lock)
+        if (_disposed)
         {
-            if (_disposed) return false;
-            return _data.Users.Any(u => u.QqId == qqId);
+            return false;
         }
+
+        // 使用ConcurrentDictionary的线程安全方法，无需锁
+        return _users.ContainsKey(qqId);
     }
 
     public bool PasscodeExists(string passcode)
     {
-        lock (Lock)
+        if (_disposed || string.IsNullOrWhiteSpace(passcode))
         {
-            if (_disposed) return false;
+            return false;
+        }
 
-            if (string.IsNullOrWhiteSpace(passcode))
-            {
-                return false;
-            }
-
-            return _data.Users.Any(u => u.Passcode.Equals(passcode, StringComparison.OrdinalIgnoreCase));
+        _rwLock.EnterReadLock();
+        try
+        {
+            return _users.Values.Any(u => u.Passcode.Equals(passcode, StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            _rwLock.ExitReadLock();
         }
     }
 
-    public bool AddUser(PendingUser user)
+    public bool AddUser(UserInfo userInfo)
     {
-        lock (Lock)
+        if (_disposed)
         {
-            if (_disposed) return false;
+            return false;
+        }
 
-            // 检查用户是否已存在
-            if (_data.Users.Any(u => u.QqId == user.QqId))
+        var newUser = new UserInfo
+        {
+            QqId = userInfo.QqId,
+            Status = userInfo.Status,
+            Passcode = userInfo.Passcode,
+            CreatedAt = userInfo.CreatedAt == default ? DateTime.UtcNow : userInfo.CreatedAt,
+            UpdatedAt = DateTime.UtcNow,
+            ExpriedAt = userInfo.ExpriedAt
+        };
+
+        if (_users.TryAdd(newUser.QqId, newUser))
+        {
+            _pendingChanges.Enqueue(new DataChange
             {
-                return false;
-            }
-
-            // 创建用户副本并设置时间戳
-            var newUser = new PendingUser
-            {
-                QqId = user.QqId,
-                Status = user.Status,
-                Passcode = user.Passcode,
-                CreatedAt = user.CreatedAt == default ? DateTime.UtcNow : user.CreatedAt,
-                UpdatedAt = DateTime.UtcNow,
-                ExpriedAt = user.ExpriedAt
-            };
-
-            _data.Users.Add(newUser);
-
-            SaveChange();
+                Type = ChangeType.Add,
+                User = newUser
+            });
+            _hasChanges = true;
             return true;
         }
+
+        return false;
     }
 
     public void AddToBlackList(ulong qqId)
     {
-        lock (Lock)
-        {
-            if (_disposed) return;
-            // 检查用户是否已存在
-            if (_data.BlackList.Contains(qqId))
-            {
-                return;
-            }
+        if (_disposed) return;
 
-            _data.BlackList.Add(qqId);
-            SaveChange();
+        if (_blackList.Add(qqId))
+        {
+            _pendingChanges.Enqueue(new DataChange
+            {
+                Type = ChangeType.BlacklistAdd,
+                QqId = qqId
+            });
+            _hasChanges = true;
         }
     }
 
     public bool IsInBlackList(ulong qqId)
     {
-        lock (Lock)
-        {
-            if (_disposed)
-            {
-                return false;
-            }
+        if (_disposed) return false;
 
-            return _data.BlackList.Contains(qqId);
-        }
+        // ConcurrentHashSet是线程安全的，无需锁
+        return _blackList.Contains(qqId);
     }
 
     public void RemoveFromBlackList(ulong qqId)
     {
-        lock (Lock)
-        {
-            if (_disposed) return;
-            // 检查用户是否在黑名单中
-            if (!_data.BlackList.Contains(qqId))
-            {
-                return;
-            }
+        if (_disposed) return;
 
-            _data.BlackList.Remove(qqId);
-            SaveChange();
+        if (_blackList.TryRemove(qqId))
+        {
+            _pendingChanges.Enqueue(new DataChange
+            {
+                Type = ChangeType.BlacklistRemove,
+                QqId = qqId
+            });
+            _hasChanges = true;
         }
     }
 
-    public bool UpdateUser(PendingUser user)
+    public bool UpdateUser(UserInfo userInfo)
     {
-        lock (Lock)
-        {
-            if (_disposed) return false;
+        if (_disposed) return false;
 
-            var existingUser = _data.Users.FirstOrDefault(u => u.QqId == user.QqId);
-            if (existingUser == null)
+        // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+        return _users.AddOrUpdate(
+            userInfo.QqId,
+            userInfo, // 如果不存在则添加
+            (_, existingUser) =>
             {
-                return false;
-            }
+                // 更新现有用户
+                existingUser.Status = userInfo.Status;
+                existingUser.Passcode = userInfo.Passcode;
+                existingUser.UpdatedAt = DateTime.UtcNow;
+                existingUser.ExpriedAt = userInfo.ExpriedAt;
 
-            // 更新现有用户的属性
-            existingUser.Status = user.Status;
-            existingUser.Passcode = user.Passcode;
-            existingUser.UpdatedAt = DateTime.UtcNow;
-            existingUser.ExpriedAt = user.ExpriedAt;
+                _pendingChanges.Enqueue(new DataChange
+                {
+                    Type = ChangeType.Update,
+                    User = existingUser
+                });
+                _hasChanges = true;
 
-            SaveChange();
-            return true;
-        }
+                return existingUser;
+            }) != null;
     }
 
     public bool DeleteUser(ulong qqId)
     {
-        lock (Lock)
+        if (_disposed) return false;
+
+        if (_users.TryRemove(qqId, out _))
         {
-            if (_disposed) return false;
-
-            var user = _data.Users.FirstOrDefault(u => u.QqId == qqId);
-            if (user == null)
+            _pendingChanges.Enqueue(new DataChange
             {
-                return false;
-            }
-
-            _data.Users.Remove(user);
-
-            SaveChange();
+                Type = ChangeType.Delete,
+                QqId = qqId
+            });
+            _hasChanges = true;
             return true;
         }
+
+        return false;
     }
 
-    // 新增：获取所有用户的安全副本
-    public List<PendingUser> GetAllUsers()
+    public List<UserInfo> GetAllUsers()
     {
-        lock (Lock)
-        {
-            if (_disposed) return [];
+        if (_disposed) return [];
 
-            return
-            [
-                .. _data.Users.Select(u => new PendingUser
-                {
-                    QqId = u.QqId,
-                    Status = u.Status,
-                    Passcode = u.Passcode,
-                    CreatedAt = u.CreatedAt,
-                    UpdatedAt = u.UpdatedAt
-                })
-            ];
+        _rwLock.EnterReadLock();
+        try
+        {
+            return _users.Values.Select(CloneUser).ToList();
+        }
+        finally
+        {
+            _rwLock.ExitReadLock();
         }
     }
 
-    // 新增：获取用户数量
     public int GetUserCount()
     {
-        lock (Lock)
+        return _disposed ? 0 : _users.Count;
+    }
+
+    // 手动触发保存
+    public async Task SaveNowAsync()
+    {
+        if (!_disposed && _hasChanges)
         {
-            return _disposed ? 0 : _data.Users.Count;
+            await SaveChangesAsync().ConfigureAwait(false);
         }
+    }
+
+    private static UserInfo CloneUser(UserInfo userInfo)
+    {
+        return new UserInfo
+        {
+            QqId = userInfo.QqId,
+            Status = userInfo.Status,
+            Passcode = userInfo.Passcode,
+            CreatedAt = userInfo.CreatedAt,
+            UpdatedAt = userInfo.UpdatedAt,
+            ExpriedAt = userInfo.ExpriedAt
+        };
     }
 
     public void Dispose()
     {
         Dispose(true);
+        // ReSharper disable once GCSuppressFinalizeForTypeWithoutDestructor
+        GC.SuppressFinalize(this);
     }
 
     private void Dispose(bool disposing)
     {
-        lock (Lock)
+        if (!_disposed && disposing)
         {
-            if (!_disposed && disposing)
+            _disposed = true;
+
+            try
             {
+                _expireTimer.Dispose();
+                _saveTimer.Dispose();
+
                 // 最后保存一次数据
-                try
+                if (_hasChanges)
                 {
-                    _timer.Dispose();
-                    SaveChange();
-                }
-                catch
-                {
-                    // 忽略dispose时的保存错误
+                    SaveChangesAsync().GetAwaiter().GetResult();
                 }
 
-                _disposed = true;
+                _rwLock.Dispose();
+                _saveSemaphore.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Error during dispose: {Message}", ex.Message);
             }
         }
     }
+}
+
+// 变更跟踪相关类
+public class DataChange
+{
+    public ChangeType Type { get; set; }
+    public UserInfo? User { get; set; }
+    public ulong QqId { get; set; }
+}
+
+public enum ChangeType
+{
+    Add,
+    Update,
+    Delete,
+    BlacklistAdd,
+    BlacklistRemove
+}
+
+// 线程安全的HashSet实现
+public class ConcurrentHashSet<T> where T : notnull
+{
+    private readonly ConcurrentDictionary<T, byte> _dictionary = new();
+
+    public bool Add(T item) => _dictionary.TryAdd(item, 0);
+
+    public bool Contains(T item) => _dictionary.ContainsKey(item);
+
+    public bool TryRemove(T item) => _dictionary.TryRemove(item, out _);
+
+    public int Count => _dictionary.Count;
+
+    public List<T> ToList() => _dictionary.Keys.ToList();
 }

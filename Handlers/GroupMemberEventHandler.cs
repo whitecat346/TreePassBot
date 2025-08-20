@@ -29,27 +29,30 @@ public class GroupMemberEventHandler(
         await messageService.SendGroupMessageAsync(e.GroupId,
         [
             new AtSegment(e.UserId),
-            new TextSegment("欢迎来到审核群，请填写群公告中的问卷进行审核：\n"),
-            new TextSegment("建议使用浏览器访问，而不是在QQ中打开。")
+            new TextSegment("\n欢迎来到审核群，请填写群公告中的问卷进行审核："),
+            new TextSegment("\n建议使用浏览器访问，而不是在QQ中打开。")
         ]);
     }
 
     public async Task HandleGroupMemberDecrease(GroupMemberDecreaseEventArgs e)
     {
-        if (e.GroupId != _config.AuditGroupId)
+        if (e.GroupId == _config.AuditGroupId)
         {
-            var userInfo = await messageService.GetGroupMemberInfo(e.GroupId, e.UserId);
-
-            if (userInfo?.Role is GroupRoleType.Admin or GroupRoleType.Owner)
-            {
-                AddBanedMember(e);
-            }
+            logger.LogInformation("Remove {UserId} from {GroupId}", e.UserId, e.GroupId);
+            await userService.DeleteUserAsync(e.UserId);
 
             return;
         }
 
-        logger.LogInformation("Remove {UserId} from {GroupId}", e.UserId, e.GroupId);
-        await userService.DeleteUserAsync(e.UserId);
+        if (_config.MainGroupIds.Contains(e.GroupId))
+        {
+            var userInfo = await messageService.GetGroupMemberInfo(e.GroupId, e.UserId);
+
+            if (userInfo?.Role is not GroupRoleType.Member)
+            {
+                AddBanedMember(e);
+            }
+        }
     }
 
     private void AddBanedMember(GroupMemberDecreaseEventArgs e)

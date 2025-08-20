@@ -5,6 +5,7 @@ using Makabaka.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using TreePassBot.Handlers.AdminCommands.Data;
 using TreePassBot.Handlers.AdminCommands.Permission;
 using TreePassBot.Models;
 
@@ -129,18 +130,23 @@ public class CommandDispatcher
             var moduleInstance = scoop.ServiceProvider.GetRequiredService(commandInfo.ModuleType);
 
             var task = (Task<bool>?)commandInfo.Method.Invoke(moduleInstance, [e]);
-            if (task != null)
+            if (task == null) // failed to invoke method
             {
-                var result = await task;
-
-                if (result == false)
-                {
-                    await e.ReplyAsync([
-                        new AtSegment(e.UserId), new TextSegment("命令执行失败\n使用方法："),
-                        new TextSegment(commandInfo.Attribute.Usage)
-                    ]);
-                }
+                _logger.LogError("Failed to invoke command: {Name}", commandName);
+                return;
             }
+
+            var success = await task;
+            if (success)
+            {
+                return;
+            }
+
+            // failed
+            await e.ReplyAsync([
+                new AtSegment(e.UserId), new TextSegment("命令执行失败\n使用方法："),
+                new TextSegment(commandInfo.Attribute.Usage)
+            ]);
         }
         catch (Exception ex)
         {

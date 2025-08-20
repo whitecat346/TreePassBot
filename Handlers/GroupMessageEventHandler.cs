@@ -18,48 +18,26 @@ public partial class GroupMessageEventHandler(
     CommandDispatcher commandDispatcher,
     IOptions<BotConfig> config,
     PasscodeGeneratorUtil generator,
+    ArgumentsSpiliterUtil spiliter,
     ILogger<GroupMessageEventHandler> logger)
 {
     private readonly BotConfig _config = config.Value;
-    private static readonly Regex CommandRegex = AuditorCommandRegex();
+    private static readonly Regex AuditCommandRegex = AuditorCommandRegexFunc();
 
     public async Task HandleGroupMessage(GroupMessageEventArgs e)
     {
         var msg = e.Message.ToString().Trim();
 
-#if DEBUG
         logger.LogInformation("Received group message from {GroupId} by {UserId}: {Message}",
-            e.GroupId, e.UserId, msg);
-#endif
+                              e.GroupId, e.UserId, msg);
 
         if (_config.AuditorQqIds.Contains(e.UserId) && e.Message[0] is AtSegment)
         {
-#if DEBUG
-            logger.LogInformation("Handle auditor command: {message}", msg);
-#endif
-
             await HandleAuditorCommandAsync(e);
             return;
         }
 
-#if DEBUG
-        logger.LogInformation("Handle admin command: {msg}", msg);
-#endif
-
         await HandleAdminCommandAsync(e);
-
-        //        if (e.Message[0] is AtSegment && e.Message.Count == 1)
-        //        {
-        //#if DEBUG
-        //            logger.LogInformation("Handle refresh passcode command: {msg}", msg);
-        //#endif
-
-        //            await HandleRefreshPasscodeAsync(e);
-        //        }
-
-#if DEBUG
-        logger.LogInformation("Do nothing.");
-#endif
     }
 
     [Obsolete]
@@ -71,7 +49,7 @@ public partial class GroupMessageEventHandler(
             return;
         }
 
-        if (user.Status == AuditStatus.Expried)
+        if (user.Status == AuditStatus.Expired)
         {
             var passcode = await generator.GenerateUniquePasscodeAsync();
             user.Passcode = passcode;
@@ -87,7 +65,7 @@ public partial class GroupMessageEventHandler(
             ]);
 
             logger.LogInformation("User {qqId} passed expried, generating new passcode: {passcode}.", e.UserId,
-                passcode);
+                                  passcode);
         }
     }
 
@@ -103,83 +81,116 @@ public partial class GroupMessageEventHandler(
             return;
         }
 
-        var match = CommandRegex.Match(e.Message.ToString());
+        var msg = e.Message.ToString();
+        var match = AuditCommandRegex.Match(msg);
         if (!match.Success)
         {
             return;
         }
 
-        var targetQqIdStr = match.Groups[1].Value;
+        logger.LogInformation("Auditor {Id} issued auditor command: {Content}", e.UserId, msg);
+
+        var targetIdStr = match.Groups[1].Value;
 
         try
         {
-            var targetQqIds = targetQqIdStr.Split('\n', StringSplitOptions.RemoveEmptyEntries)
-                                           .SelectMany(it => it.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-                                           .Where(it => !string.IsNullOrWhiteSpace(it))
-                                           .Select(ulong.Parse)
-                                           .ToHashSet();
+            var targetQqIds = spiliter.SpilitArguments(targetIdStr)
+                                      .Select(ulong.Parse)
+                                      .ToHashSet();
 
             var command = match.Groups[2].Value.ToLower();
 
+            Message replyMsg;
             if (command.Equals("pass", StringComparison.OrdinalIgnoreCase))
             {
-                List<ulong> failedQqIds = [];
-
-                foreach (var targetQqId in targetQqIds)
-                {
-                    var success = await auditService.ProcessApprovalAsync(targetQqId, e.UserId, e.GroupId);
-                    if (!success)
-                    {
-                        failedQqIds.Add(targetQqId);
-                    }
-                }
-
-                if (failedQqIds.Count == 0)
-                {
-                    await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("已通过所有指定用户的审核!")]);
-                }
-                else
-                {
-                    var failedQqIdStr = string.Join("\n", failedQqIds);
-                    await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"以下用户处理失败: {failedQqIdStr}")]);
-                }
+                replyMsg = await PassCommandHandler(targetQqIds, e.UserId, e.GroupId);
             }
             else if (command.Equals("deny", StringComparison.OrdinalIgnoreCase))
             {
-                List<ulong> failedQqIds = [];
-
-                foreach (var targetQqId in targetQqIds)
-                {
-                    var success = await auditService.ProcessDenialAsync(targetQqId, e.UserId, e.GroupId);
-                    if (!success)
-                    {
-                        failedQqIds.Add(targetQqId);
-                    }
-                }
-
-                if (failedQqIds.Count == 0)
-                {
-                    await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("已拒绝所有指定用户的审核!")]);
-                }
-                else
-                {
-                    var failedQqIdStr = string.Join("\n", failedQqIds);
-                    await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"以下用户处理失败: {failedQqIdStr}")]);
-                }
+                replyMsg = await DenyCommandHandler(targetQqIds, e.UserId, e.GroupId);
             }
             else
             {
-                await e.ReplyAsync(
-                    [new AtSegment(e.UserId), new TextSegment("未知的命令，请使用 `pass` 或 `deny`。")]);
+                replyMsg = [new AtSegment(e.UserId), new TextSegment("未知的执行分支，请使用 `pass` 或 `deny`。")];
             }
+
+            await e.ReplyAsync(replyMsg);
+        }
+        catch (FormatException formatException)
+        {
+            await e.ReplyAsync([
+                new AtSegment(e.UserId),
+                new TextSegment("输入的QQ号格式错误，请检查你的输入。\n"),
+                new TextSegment($"错误信息为：{formatException.Message}")
+            ]);
+            logger.LogError("Invalid format for QQ number: {Msg}", formatException.Message);
+        }
+        catch (OverflowException overflow)
+        {
+            await e.ReplyAsync([
+                new AtSegment(e.UserId),
+                new TextSegment("输入的QQ号超出了ulong上限，发生了整形溢出。\n"),
+                new TextSegment($"错误信息为：{overflow.Message}")
+            ]);
+            logger.LogError("Occurred overflow exception when try to convert string to ulong: {Msg}", overflow.Message);
         }
         catch (Exception exception)
         {
-            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("在尝试转换字符串时发生了错误，你是不是输入了错误的QQ号呢？")]);
-            logger.LogError("Failed to convert string to ulong: {Msg}", exception.Message);
+            await e.ReplyAsync([
+                new AtSegment(e.UserId),
+                new TextSegment("发生了未知错误。\n"),
+                new TextSegment($"错误信息为：{exception.Message}")
+            ]);
+            logger.LogError("Caught an unknow exception: {Msg}", exception);
         }
     }
 
     [GeneratedRegex(@"((?:\d+\s+)+)(pass|deny)", RegexOptions.IgnoreCase, "zh-CN")]
-    private static partial Regex AuditorCommandRegex();
+    private static partial Regex AuditorCommandRegexFunc();
+
+    private async Task<Message> PassCommandHandler(HashSet<ulong> targetIds, ulong operatorId, ulong groupId)
+    {
+        List<ulong> failedQqIds = [];
+
+        foreach (var targetQqId in targetIds)
+        {
+            var success = await auditService.ProcessApprovalAsync(targetQqId, operatorId, groupId);
+            if (!success)
+            {
+                failedQqIds.Add(targetQqId);
+            }
+        }
+
+        if (failedQqIds.Count == 0)
+        {
+            return [new AtSegment(operatorId), new TextSegment("已通过所有指定用户的审核!")];
+        }
+
+        var failedQqIdStr = string.Join('\n', failedQqIds);
+        return [new AtSegment(operatorId), new TextSegment($"以下用户处理失败: {failedQqIdStr}")];
+    }
+
+    private async Task<Message> DenyCommandHandler(HashSet<ulong> targetIds, ulong operatorId, ulong groupId)
+    {
+        List<ulong> failedQqIds = [];
+
+        foreach (var targetQqId in targetIds)
+        {
+            var success = await auditService.ProcessDenialAsync(targetQqId, operatorId, groupId);
+            if (!success)
+            {
+                failedQqIds.Add(targetQqId);
+            }
+        }
+
+        if (failedQqIds.Count == 0)
+        {
+            return [new AtSegment(operatorId), new TextSegment("已拒绝所有指定用户的审核!")];
+        }
+        else
+        {
+            var failedQqIdStr = string.Join("\n", failedQqIds);
+            return [new AtSegment(operatorId), new TextSegment($"以下用户处理失败: {failedQqIdStr}")];
+        }
+    }
 }

@@ -2,7 +2,6 @@ using Makabaka.Events;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TreePassBot.Models;
-using TreePassBot.Services;
 using TreePassBot.Services.Interfaces;
 
 namespace TreePassBot.Handlers;
@@ -10,6 +9,7 @@ namespace TreePassBot.Handlers;
 public class GroupRequestEventHandler(
     IUserService userService,
     IOptions<BotConfig> config,
+    IMessageService messageService,
     ILogger<GroupRequestEventHandler> logger)
 {
     private readonly BotConfig _config = config.Value;
@@ -44,19 +44,19 @@ public class GroupRequestEventHandler(
     {
         try
         {
-            var (rightPasscode, expriedPasscode) = await userService.ValidateJoinRequestAsync(e.UserId, e.Comment);
+            var (rightPasscode, expiredPasscode) = await userService.ValidateJoinRequestAsync(e.UserId, e.Comment);
             if (rightPasscode)
             {
                 await e.AcceptAsync();
                 await userService.DeleteUserAsync(e.UserId);
                 logger.LogInformation("User {qqId} passed audit.", e.UserId);
 
-                await QqBotService.MakabakaApp.BotContext.KickGroupMemberAsync(config.Value.AuditGroupId, e.UserId);
+                await messageService.KickGroupMemberAsync(_config.AuditGroupId, e.UserId);
             }
-            else if (expriedPasscode)
+            else if (expiredPasscode)
             {
-                await e.RejectAsync("验证码以过期，请重新申请审核！");
-                logger.LogInformation("User {qqId} 's passcode was expried.", e.UserId);
+                await e.RejectAsync("验证码已过期，请重新申请审核！");
+                logger.LogInformation("User {qqId} 's passcode was expired.", e.UserId);
             }
             else
             {
