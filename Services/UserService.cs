@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using TreePassBot.Data;
 using TreePassBot.Data.Entities;
+using TreePassBot.Exceptions;
 using TreePassBot.Services.Interfaces;
 
 namespace TreePassBot.Services;
@@ -39,10 +40,15 @@ public class UserService(
     }
 
     /// <inheritdoc />
-    public Task<bool> UpdateUserStatusAsync(ulong qqId, AuditStatus status, string passcode)
+    public Task<bool> TryUpdateUserStatusAsync(
+        ulong qqId, AuditStatus status, string passcode, out UserInfo? updatedUser)
     {
         var user = dataStore.GetUserByQqId(qqId);
-        if (user == null) return Task.FromResult(false);
+        if (user == null)
+        {
+            updatedUser = null;
+            return Task.FromResult(false);
+        }
 
         user.Status = status;
         user.Passcode = passcode;
@@ -56,16 +62,19 @@ public class UserService(
         dataStore.UpdateUser(user);
 
         logger.LogInformation("Update user {QqId} status to {State}.", qqId, status);
+
+        updatedUser = user;
         return Task.FromResult(true);
     }
 
+    /// <exception cref="UserNotFoundException">用户未找到</exception>
     /// <inheritdoc />
     public Task<(bool, bool)> ValidateJoinRequestAsync(ulong qqId, string passcode)
     {
         var user = dataStore.GetUserByQqId(qqId);
         if (user == null)
         {
-            throw new ArgumentNullException(nameof(user), "User not found in data store.");
+            throw new UserNotFoundException(qqId);
         }
 
         logger.LogInformation("Validate user {QqId}.", qqId);

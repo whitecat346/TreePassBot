@@ -39,7 +39,8 @@ public class AuditService(
         var passcode = await generator.GenerateUniquePasscodeAsync();
 
         // update data
-        var success = await userService.UpdateUserStatusAsync(targetQqId, AuditStatus.Approved, passcode);
+        var success =
+            await userService.TryUpdateUserStatusAsync(targetQqId, AuditStatus.Approved, passcode, out _);
 
         if (success)
         {
@@ -119,12 +120,12 @@ public class AuditService(
             return true;
         }
 
-        await userService.UpdateUserStatusAsync(targetQqId, status, string.Empty);
+        await userService.TryUpdateUserStatusAsync(targetQqId, status, string.Empty, out _);
 
         await messageService.SendGroupMessageAsync(groupId,
-            [new AtSegment(targetQqId),
-                new TextSegment("很抱歉，您的审核未通过！"),
-                new TextSegment(lastChance)]);
+        [new AtSegment(targetQqId),
+            new TextSegment("很抱歉，您的审核未通过！"),
+            new TextSegment(lastChance)]);
 
         logger.LogInformation("User {TargetQqId} has been denied approval by operator {OperatorQqId}.", targetQqId, operatorQqId);
 

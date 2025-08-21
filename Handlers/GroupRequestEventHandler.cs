@@ -1,6 +1,7 @@
 using Makabaka.Events;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using TreePassBot.Exceptions;
 using TreePassBot.Models;
 using TreePassBot.Services.Interfaces;
 
@@ -42,9 +43,12 @@ public class GroupRequestEventHandler(
 
     private async Task MainGroupHandlerAsync(GroupAddRequestEventArgs e)
     {
+        var userRequestComment = e.Comment.Trim([' ', '\n']);
+
         try
         {
-            var (rightPasscode, expiredPasscode) = await userService.ValidateJoinRequestAsync(e.UserId, e.Comment);
+            var (rightPasscode, expiredPasscode) =
+                await userService.ValidateJoinRequestAsync(e.UserId, userRequestComment);
             if (rightPasscode)
             {
                 await e.AcceptAsync();
@@ -64,9 +68,9 @@ public class GroupRequestEventHandler(
                 logger.LogInformation("User {qqId} was denied by wrong passcode.", e.UserId);
             }
         }
-        catch (ArgumentNullException)
+        catch (UserNotFoundException ex)
         {
-            logger.LogInformation("User {qqId} not found.", e.UserId);
+            logger.LogInformation(ex.Message);
             await e.RejectAsync("您不在审核名单中！");
         }
     }

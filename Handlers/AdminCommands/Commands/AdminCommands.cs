@@ -265,7 +265,7 @@ public class AdminCommands(
             return true;
         }
 
-        var response = new StringBuilder("以下已在大群的用户仍在审核列表中:\n");
+        var response = new StringBuilder("以下已在大群的用户仍在审核群中:\n");
         foreach (var userId in duplicatedUserIds)
         {
             var userInfo = auditGroupUserDict[userId];
