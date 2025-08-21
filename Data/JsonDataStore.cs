@@ -154,19 +154,25 @@ public sealed class JsonDataStore : IDisposable
     private async Task SaveChangesAsync()
     {
         if (!await _saveSemaphore.WaitAsync(100).ConfigureAwait(false))
+        {
             return;
+        }
 
         try
         {
-            if (_disposed || !_hasChanges) return;
+            if (_disposed || !_hasChanges)
+            {
+                return;
+            }
 
             _rwLock.EnterReadLock();
+
             UserData userData;
             try
             {
                 userData = new UserData
                 {
-                    Users = _users.Values.ToList(),
+                    Users = [.. _users.Values],
                     BlackList = _blackList.ToList()
                 };
             }
@@ -183,7 +189,6 @@ public sealed class JsonDataStore : IDisposable
 
             var json = JsonSerializer.Serialize(userData, typeof(UserData), UserDataContext.Default);
 
-            // 原子写入
             var tempPath = _filePath + ".tmp";
             await File.WriteAllTextAsync(tempPath, json).ConfigureAwait(false);
             File.Move(tempPath, _filePath, true);
@@ -199,7 +204,7 @@ public sealed class JsonDataStore : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning("Error saving data to {FilePath}: {Message}", _filePath, ex.Message);
+            _logger.LogError("Failed to save data to {FilePath}: {Message}", _filePath, ex.Message);
 
             try
             {

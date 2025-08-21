@@ -33,7 +33,7 @@ public class UserService(
     }
 
     /// <inheritdoc />
-    public Task<UserInfo?> GetPendingUserAsync(ulong qqId)
+    public Task<UserInfo?> GetUserInfoByIdAsync(ulong qqId)
     {
         logger.LogInformation("Try to get user {QqId}.", qqId);
         return Task.FromResult(dataStore.GetUserByQqId(qqId));
