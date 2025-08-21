@@ -87,4 +87,3 @@ internal static class Program
         await AppHost.RunAsync();
     }
 }
-#nullable restore

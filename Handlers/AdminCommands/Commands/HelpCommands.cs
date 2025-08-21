@@ -22,7 +22,7 @@ public class HelpCommands(CommandDispatcher dispatcher)
             }
         }
 
-        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment(helpMessage.ToString())]);
+        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment(helpMessage.ToString())]).ConfigureAwait(false);
         return true;
     }
 }

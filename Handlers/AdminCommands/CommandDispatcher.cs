@@ -108,7 +108,8 @@ public class CommandDispatcher
 
         if (!_commands.TryGetValue(commandName, out var commandInfo))
         {
-            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("未知命令："), new TextSegment(commandName)]);
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("未知命令："), new TextSegment(commandName)])
+                   .ConfigureAwait(false);
             _logger.LogWarning("Command {Command} not found.", commandName);
 
             return;
@@ -136,7 +137,7 @@ public class CommandDispatcher
                 return;
             }
 
-            var success = await task;
+            var success = await task.ConfigureAwait(false);
             if (success)
             {
                 return;
@@ -146,7 +147,7 @@ public class CommandDispatcher
             await e.ReplyAsync([
                 new AtSegment(e.UserId), new TextSegment("命令执行失败\n使用方法："),
                 new TextSegment(commandInfo.Attribute.Usage)
-            ]);
+            ]).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

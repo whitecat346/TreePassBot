@@ -3,7 +3,6 @@ using Makabaka.Events;
 using Makabaka.Messages;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using TreePassBot.Data;
 using TreePassBot.Data.Entities;
 using TreePassBot.Handlers.AdminCommands;
 using TreePassBot.Models;
@@ -14,7 +13,7 @@ namespace TreePassBot.Handlers;
 
 public partial class GroupMessageEventHandler(
     IAuditService auditService,
-    JsonDataStore dataStore,
+    IUserService userService,
     CommandDispatcher commandDispatcher,
     IOptions<BotConfig> config,
     PasscodeGeneratorUtil generator,
@@ -33,17 +32,17 @@ public partial class GroupMessageEventHandler(
 
         if (_config.AuditorQqIds.Contains(e.UserId) && e.Message[0] is AtSegment)
         {
-            await HandleAuditorCommandAsync(e);
+            await HandleAuditorCommandAsync(e).ConfigureAwait(false);
             return;
         }
 
-        await HandleAdminCommandAsync(e);
+        await HandleAdminCommandAsync(e).ConfigureAwait(false);
     }
 
     [Obsolete]
     private async Task HandleRefreshPasscodeAsync(GroupMessageEventArgs e)
     {
-        var user = dataStore.GetUserByQqId(e.UserId);
+        var user = await userService.GetUserInfoByIdAsync(e.UserId).ConfigureAwait(false);
         if (user == null)
         {
             return;
@@ -51,18 +50,16 @@ public partial class GroupMessageEventHandler(
 
         if (user.Status == AuditStatus.Expired)
         {
-            var passcode = await generator.GenerateUniquePasscodeAsync();
-            user.Passcode = passcode;
-            user.Status = AuditStatus.Approved;
-            user.ExpriedAt = DateTime.UtcNow + TimeSpan.FromMinutes(10);
+            var passcode = await generator.GenerateUniquePasscodeAsync().ConfigureAwait(false);
 
-            dataStore.UpdateUser(user);
+            await userService.TryUpdateUserStatusAsync(user.QqId, AuditStatus.Approved, passcode, out _)
+                             .ConfigureAwait(false);
 
             await e.ReplyAsync([
                 new AtSegment(e.UserId),
                 new TextSegment("您的新验证码是："),
                 new TextSegment(user.Passcode)
-            ]);
+            ]).ConfigureAwait(false);
 
             logger.LogInformation("User {qqId} passed expried, generating new passcode: {passcode}.", e.UserId,
                                   passcode);
@@ -103,18 +100,18 @@ public partial class GroupMessageEventHandler(
             Message replyMsg;
             if (command.Equals("pass", StringComparison.OrdinalIgnoreCase))
             {
-                replyMsg = await PassCommandHandler(targetQqIds, e.UserId, e.GroupId);
+                replyMsg = await PassCommandHandler(targetQqIds, e.UserId, e.GroupId).ConfigureAwait(false);
             }
             else if (command.Equals("deny", StringComparison.OrdinalIgnoreCase))
             {
-                replyMsg = await DenyCommandHandler(targetQqIds, e.UserId, e.GroupId);
+                replyMsg = await DenyCommandHandler(targetQqIds, e.UserId, e.GroupId).ConfigureAwait(false);
             }
             else
             {
                 replyMsg = [new AtSegment(e.UserId), new TextSegment("未知的执行分支，请使用 `pass` 或 `deny`。")];
             }
 
-            await e.ReplyAsync(replyMsg);
+            await e.ReplyAsync(replyMsg).ConfigureAwait(false);
         }
         catch (FormatException formatException)
         {
@@ -122,7 +119,7 @@ public partial class GroupMessageEventHandler(
                 new AtSegment(e.UserId),
                 new TextSegment("输入的QQ号格式错误，请检查你的输入。\n"),
                 new TextSegment($"错误信息为：{formatException.Message}")
-            ]);
+            ]).ConfigureAwait(false);
             logger.LogError("Invalid format for QQ number: {Msg}", formatException.Message);
         }
         catch (OverflowException overflow)
@@ -131,7 +128,7 @@ public partial class GroupMessageEventHandler(
                 new AtSegment(e.UserId),
                 new TextSegment("输入的QQ号超出了ulong上限，发生了整形溢出。\n"),
                 new TextSegment($"错误信息为：{overflow.Message}")
-            ]);
+            ]).ConfigureAwait(false);
             logger.LogError("Occurred overflow exception when try to convert string to ulong: {Msg}", overflow.Message);
         }
         catch (Exception exception)
@@ -140,7 +137,7 @@ public partial class GroupMessageEventHandler(
                 new AtSegment(e.UserId),
                 new TextSegment("发生了未知错误。\n"),
                 new TextSegment($"错误信息为：{exception.Message}")
-            ]);
+            ]).ConfigureAwait(false);
             logger.LogError("Caught an unknow exception: {Msg}", exception);
         }
     }
@@ -154,7 +151,8 @@ public partial class GroupMessageEventHandler(
 
         foreach (var targetQqId in targetIds)
         {
-            var success = await auditService.ProcessApprovalAsync(targetQqId, operatorId, groupId);
+            var success = await auditService.ProcessApprovalAsync(targetQqId, operatorId, groupId)
+                                            .ConfigureAwait(false);
             if (!success)
             {
                 failedQqIds.Add(targetQqId);
@@ -176,7 +174,8 @@ public partial class GroupMessageEventHandler(
 
         foreach (var targetQqId in targetIds)
         {
-            var success = await auditService.ProcessDenialAsync(targetQqId, operatorId, groupId);
+            var success = await auditService.ProcessDenialAsync(targetQqId, operatorId, groupId)
+                                            .ConfigureAwait(false);
             if (!success)
             {
                 failedQqIds.Add(targetQqId);

@@ -67,12 +67,12 @@ public class QqBotService : IHostedService
     /// <inheritdoc />
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        await Init(cancellationToken);
+        await Init(cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        await MakabakaApp.StopAsync(cancellationToken);
+        await MakabakaApp.StopAsync(cancellationToken).ConfigureAwait(false);
     }
 }

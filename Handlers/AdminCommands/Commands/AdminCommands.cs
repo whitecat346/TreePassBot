@@ -28,7 +28,7 @@ public class AdminCommands(
 
         var isUnique = !dataStore.PasscodeExists(passcode);
 
-        await e.ReplyAsync([new TextSegment($"生成测试验证码: {passcode}\n在当前数据中是否唯一: {isUnique}")]);
+        await e.ReplyAsync([new TextSegment($"生成测试验证码: {passcode}\n在当前数据中是否唯一: {isUnique}")]).ConfigureAwait(false);
 
         return true;
     }
@@ -43,17 +43,19 @@ public class AdminCommands(
             return false;
         }
 
-        var user = await userService.GetPendingUserAsync(qqToCheck);
+        var user = await userService.GetUserInfoByIdAsync(qqToCheck).ConfigureAwait(false);
         if (user == null)
         {
-            var isInBlackList = await userService.IsInBlackList(qqToCheck);
+            var isInBlackList = await userService.IsInBlackList(qqToCheck).ConfigureAwait(false);
             if (isInBlackList)
             {
-                await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"用户 {qqToCheck} 位于黑名单中。")]);
+                await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"用户 {qqToCheck} 位于黑名单中。")])
+                       .ConfigureAwait(false);
                 return true;
             }
 
-            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"用户 {qqToCheck} 未在数据存储中找到。")]);
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"用户 {qqToCheck} 未在数据存储中找到。")])
+                   .ConfigureAwait(false);
             return true;
         }
 
@@ -68,7 +70,7 @@ public class AdminCommands(
             userInfo.AppendLine($"过期时间: {user.ExpriedAt:yyyy-MM-dd HH:mm:ss} (UTC)");
         }
 
-        await e.ReplyAsync([new TextSegment(userInfo.ToString())]);
+        await e.ReplyAsync([new TextSegment(userInfo.ToString())]).ConfigureAwait(false);
         return true;
     }
 
@@ -82,14 +84,16 @@ public class AdminCommands(
             return false;
         }
 
-        var success = await userService.AddPendingUserAsync(qqToAdd);
+        var success = await userService.AddPendingUserAsync(qqToAdd).ConfigureAwait(false);
         if (success)
         {
-            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"成功将用户 {qqToAdd} 添加到待审核列表。")]);
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"成功将用户 {qqToAdd} 添加到待审核列表。")])
+                   .ConfigureAwait(false);
         }
         else
         {
-            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"无法添加用户 {qqToAdd}，可能已存在或发生错误。")]);
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"无法添加用户 {qqToAdd}，可能已存在或发生错误。")])
+                   .ConfigureAwait(false);
         }
 
 
@@ -106,16 +110,18 @@ public class AdminCommands(
             return false;
         }
 
-        await userService.DeleteUserAsync(qqToReset);
-        var success = await userService.AddPendingUserAsync(qqToReset);
+        await userService.DeleteUserAsync(qqToReset).ConfigureAwait(false);
+        var success = await userService.AddPendingUserAsync(qqToReset).ConfigureAwait(false);
 
         if (success)
         {
-            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"成功将用户 {qqToReset} 重置为待审核状态。")]);
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"成功将用户 {qqToReset} 重置为待审核状态。")])
+                   .ConfigureAwait(false);
         }
         else
         {
-            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"无法重置用户 {qqToReset}，可能已存在或发生错误。")]);
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"无法重置用户 {qqToReset}，可能已存在或发生错误。")])
+                   .ConfigureAwait(false);
         }
 
         return true;
@@ -128,7 +134,8 @@ public class AdminCommands(
         const string auditHelpText = "审核员命令:\n" +
                                      "使用 @+QQ号 pass - 通过指定用户的审核\n" +
                                      "使用 @+QQ号 deny - 拒绝指定用户的审核";
-        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment(auditHelpText)]);
+        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment(auditHelpText)])
+               .ConfigureAwait(false);
         return true;
     }
 
@@ -142,9 +149,10 @@ public class AdminCommands(
             return false;
         }
 
-        await userService.AddToBlackList(qqToAdd);
+        await userService.AddToBlackList(qqToAdd).ConfigureAwait(false);
 
-        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"成功将用户 {qqToAdd} 添加到黑名单。")]);
+        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"成功将用户 {qqToAdd} 添加到黑名单。")])
+               .ConfigureAwait(false);
 
         return true;
     }
@@ -159,8 +167,9 @@ public class AdminCommands(
             return false;
         }
 
-        await userService.RemoveFromBlackList(qqToRemove);
-        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"成功将用户 {qqToRemove} 从黑名单中移除。")]);
+        await userService.RemoveFromBlackList(qqToRemove).ConfigureAwait(false);
+        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"成功将用户 {qqToRemove} 从黑名单中移除。")])
+               .ConfigureAwait(false);
         return true;
     }
 
@@ -170,11 +179,12 @@ public class AdminCommands(
     {
         var targetGroupId = config.Value.AuditGroupId;
 
-        var userList = await messageService.GetGroupMemberList(targetGroupId);
+        var userList = await messageService.GetGroupMemberList(targetGroupId).ConfigureAwait(false);
         if (userList == null)
         {
             logger.LogWarning("Failed to get group member list.");
-            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("无法获取用户列表，可能是该群组没有成员或发生了错误。")]);
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("无法获取用户列表，可能是该群组没有成员或发生了错误。")])
+                   .ConfigureAwait(false);
             return false;
         }
 
@@ -193,16 +203,17 @@ public class AdminCommands(
 
         if (notInList.Count == 0)
         {
-            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("没有用户需要重新加入。")]);
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("没有用户需要重新加入。")]).ConfigureAwait(false);
             return true;
         }
 
         foreach (var userId in notInList)
         {
-            await userService.AddPendingUserAsync(userId);
+            await userService.AddPendingUserAsync(userId).ConfigureAwait(false);
         }
 
-        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"共有{notInList.Count}个用户被重新加入。")]);
+        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"共有{notInList.Count}个用户被重新加入。")])
+               .ConfigureAwait(false);
 
         return true;
     }
@@ -216,7 +227,7 @@ public class AdminCommands(
         var targetGroupIds = botConfig.MainGroupIds;
         var tasks = targetGroupIds.Select(async groupId =>
         {
-            var members = await messageService.GetGroupMemberList(groupId);
+            var members = await messageService.GetGroupMemberList(groupId).ConfigureAwait(false);
             if (members != null)
             {
                 return members;
@@ -227,7 +238,7 @@ public class AdminCommands(
         }).ToList();
 
         // 并发等待所有任务完成
-        var results = await Task.WhenAll(tasks);
+        var results = await Task.WhenAll(tasks).ConfigureAwait(false);
 
         // 将所有结果合并到一个列表中
         var mainUsers = results.SelectMany(x => x).ToList();
@@ -235,15 +246,15 @@ public class AdminCommands(
         if (mainUsers.Count == 0)
         {
             logger.LogWarning("Failed to get group group member list.");
-            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("获取用户列表时失败。")]);
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("获取用户列表时失败。")]).ConfigureAwait(false);
             return false;
         }
 
-        var auditUsers = await messageService.GetGroupMemberList(botConfig.AuditGroupId);
+        var auditUsers = await messageService.GetGroupMemberList(botConfig.AuditGroupId).ConfigureAwait(false);
         if (auditUsers == null)
         {
             logger.LogWarning("Failed to get audit group member list.");
-            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("无法获取审核群组的用户列表。")]);
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("无法获取审核群组的用户列表。")]).ConfigureAwait(false);
             return false;
         }
 
@@ -261,7 +272,7 @@ public class AdminCommands(
 
         if (duplicatedUserIds.Count == 0)
         {
-            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("没有找到重复的用户。")]);
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("没有找到重复的用户。")]).ConfigureAwait(false);
             return true;
         }
 
@@ -272,7 +283,7 @@ public class AdminCommands(
             response.AppendLine($"{userInfo.Nickname} - {userInfo.UserId}");
         }
 
-        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment(response.ToString())]);
+        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment(response.ToString())]).ConfigureAwait(false);
         return true;
     }
 
@@ -288,7 +299,7 @@ public class AdminCommands(
             sb.AppendLine($"{user.QqId}");
         }
 
-        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment(sb.ToString())]);
+        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment(sb.ToString())]).ConfigureAwait(false);
         return true;
     }
 
@@ -302,7 +313,7 @@ public class AdminCommands(
         if (existUsersResponse == null)
         {
             logger.LogWarning("Failed to get audit group member list.");
-            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("无法获取审核群组的用户列表。")]);
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("无法获取审核群组的用户列表。")]).ConfigureAwait(false);
             return false;
         }
 
@@ -322,19 +333,19 @@ public class AdminCommands(
 
         if (notInListUsers.Count == 0)
         {
-            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("没有需要移除的用户。")]);
+            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("没有需要移除的用户。")]).ConfigureAwait(false);
             return true;
         }
 
         foreach (var userId in notInListUsers)
         {
-            await userService.DeleteUserAsync(userId);
+            await userService.DeleteUserAsync(userId).ConfigureAwait(false);
         }
 
         await e.ReplyAsync([
             new AtSegment(e.UserId),
             new TextSegment($"操作完成，已从待审核列表中移除了 {notInListUsers.Count} 名不存在的用户。")
-        ]);
+        ]).ConfigureAwait(false);
 
         return true;
     }
@@ -349,8 +360,8 @@ public class AdminCommands(
             return false;
         }
 
-        await userService.DeleteUserAsync(qqToRemove);
-        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("成功将指定的用户从名单中移除！")]);
+        await userService.DeleteUserAsync(qqToRemove).ConfigureAwait(false);
+        await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("成功将指定的用户从名单中移除！")]).ConfigureAwait(false);
         return true;
     }
 }

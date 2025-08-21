@@ -24,14 +24,14 @@ public class GroupMemberEventHandler(
         }
 
         logger.LogInformation("New member {UserId} joined group {GroupId}.", e.UserId, e.GroupId);
-        await userService.AddPendingUserAsync(e.UserId);
+        await userService.AddPendingUserAsync(e.UserId).ConfigureAwait(false);
 
         await messageService.SendGroupMessageAsync(e.GroupId,
         [
             new AtSegment(e.UserId),
             new TextSegment("\n欢迎来到审核群，请填写群公告中的问卷进行审核："),
             new TextSegment("\n建议使用浏览器访问，而不是在QQ中打开。")
-        ]);
+        ]).ConfigureAwait(false);
     }
 
     public async Task HandleGroupMemberDecrease(GroupMemberDecreaseEventArgs e)
@@ -39,14 +39,14 @@ public class GroupMemberEventHandler(
         if (e.GroupId == _config.AuditGroupId)
         {
             logger.LogInformation("Remove {UserId} from {GroupId}", e.UserId, e.GroupId);
-            await userService.DeleteUserAsync(e.UserId);
+            await userService.DeleteUserAsync(e.UserId).ConfigureAwait(false);
 
             return;
         }
 
         if (_config.MainGroupIds.Contains(e.GroupId))
         {
-            var userInfo = await messageService.GetGroupMemberInfo(e.GroupId, e.UserId);
+            var userInfo = await messageService.GetGroupMemberInfo(e.GroupId, e.UserId).ConfigureAwait(false);
 
             if (userInfo?.Role is not GroupRoleType.Member)
             {
@@ -57,6 +57,6 @@ public class GroupMemberEventHandler(
 
     private void AddBanedMember(GroupMemberDecreaseEventArgs e)
     {
-        userService.AddToBlackList(e.UserId);
+        userService.AddToBlackList(e.UserId).ConfigureAwait(false);
     }
 }
