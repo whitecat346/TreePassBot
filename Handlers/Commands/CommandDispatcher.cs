@@ -5,11 +5,11 @@ using Makabaka.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using TreePassBot.Handlers.AdminCommands.Data;
-using TreePassBot.Handlers.AdminCommands.Permission;
+using TreePassBot.Handlers.Commands.Data;
+using TreePassBot.Handlers.Commands.Permission;
 using TreePassBot.Models;
 
-namespace TreePassBot.Handlers.AdminCommands;
+namespace TreePassBot.Handlers.Commands;
 
 public class CommandDispatcher
 {
@@ -89,19 +89,19 @@ public class CommandDispatcher
         _logger.LogInformation("Successed to register {Count} commands.", _commands.Count);
     }
 
-    public async Task ExecteAsync(GroupMessageEventArgs e)
+    public async Task<bool> ExecteAsync(GroupMessageEventArgs e)
     {
         var message = e.Message.ToString().Trim();
 
         if (string.IsNullOrWhiteSpace(message) || message[0] != _prefix)
         {
-            return;
+            return false;
         }
 
         var parts = message[1..].Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length == 0)
         {
-            return;
+            return false;
         }
 
         var commandName = parts[0].ToLowerInvariant();
@@ -112,15 +112,15 @@ public class CommandDispatcher
                    .ConfigureAwait(false);
             _logger.LogWarning("Command {Command} not found.", commandName);
 
-            return;
+            return true;
         }
 
         _logger.LogInformation("User {ID} try to issue command {Name}.", e.UserId, commandName);
 
         if (!IsExecutable(e, commandInfo.Roles))
         {
-            _logger.LogInformation("Un-executable command {Name} issued.", commandName);
-            return;
+            _logger.LogInformation("Un-executable user try to issue command {Name}.", commandName);
+            return true;
         }
 
         _logger.LogInformation("Execute command {Name} by {UserId}.", commandName, e.UserId);
@@ -134,13 +134,13 @@ public class CommandDispatcher
             if (task == null) // failed to invoke method
             {
                 _logger.LogError("Failed to invoke command: {Name}", commandName);
-                return;
+                return true;
             }
 
             var success = await task.ConfigureAwait(false);
             if (success)
             {
-                return;
+                return true;
             }
 
             // failed
@@ -155,6 +155,8 @@ public class CommandDispatcher
                              commandName,
                              ex.InnerException?.Message ?? ex.Message);
         }
+
+        return true;
     }
 
     private bool IsExecutable(GroupMessageEventArgs e, UserRoles role)

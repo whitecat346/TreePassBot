@@ -6,12 +6,12 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TreePassBot.Data;
 using TreePassBot.Data.Entities;
-using TreePassBot.Handlers.AdminCommands.Data;
-using TreePassBot.Handlers.AdminCommands.Permission;
+using TreePassBot.Handlers.Commands.Data;
+using TreePassBot.Handlers.Commands.Permission;
 using TreePassBot.Models;
 using TreePassBot.Services.Interfaces;
 
-namespace TreePassBot.Handlers.AdminCommands.Commands;
+namespace TreePassBot.Handlers.Commands.Commands;
 
 public class AdminCommands(
     JsonDataStore dataStore,
@@ -20,19 +20,6 @@ public class AdminCommands(
     ILogger<AdminCommands> logger,
     IOptions<BotConfig> config)
 {
-    [BotCommand("rand", Description = "生成一个随机验证码", Usage = ".rand")]
-    [RequiredPremission(UserRoles.Auditor | UserRoles.BotAdmin | UserRoles.GroupAdmin)]
-    public async Task<bool> RandomGeneration(GroupMessageEventArgs e)
-    {
-        var passcode = new string([.. Enumerable.Range(0, 10).Select(_ => (char)Random.Shared.Next('0', '9' + 1))]);
-
-        var isUnique = !dataStore.PasscodeExists(passcode);
-
-        await e.ReplyAsync([new TextSegment($"生成测试验证码: {passcode}\n在当前数据中是否唯一: {isUnique}")]).ConfigureAwait(false);
-
-        return true;
-    }
-
     [BotCommand("check", Description = "查询用户状态", Usage = ".check [QQ号]")]
     [RequiredPremission(UserRoles.Auditor | UserRoles.BotAdmin | UserRoles.GroupAdmin)]
     public async Task<bool> CheckUser(GroupMessageEventArgs e)
@@ -65,7 +52,7 @@ public class AdminCommands(
                                          $"创建时间: {user.CreatedAt:yyyy-MM-dd HH:mm:ss} (UTC)\n" +
                                          $"更新时间: {user.UpdatedAt:yyyy-MM-dd HH:mm:ss} (UTC)");
 
-        if (user.ExpriedAt != null)
+        if (user.ExpriedAt is not null)
         {
             userInfo.AppendLine($"过期时间: {user.ExpriedAt:yyyy-MM-dd HH:mm:ss} (UTC)");
         }

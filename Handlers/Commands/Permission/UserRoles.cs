@@ -1,4 +1,4 @@
-namespace TreePassBot.Handlers.AdminCommands.Permission;
+namespace TreePassBot.Handlers.Commands.Permission;
 
 [Flags]
 public enum UserRoles

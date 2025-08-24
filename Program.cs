@@ -1,11 +1,16 @@
 using System.Reflection;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Serilog;
 using TreePassBot.Data;
+using TreePassBot.Exceptions;
 using TreePassBot.Handlers;
-using TreePassBot.Handlers.AdminCommands;
+using TreePassBot.Handlers.Commands;
+using TreePassBot.Handlers.MessageHandler;
+using TreePassBot.Handlers.MessageHandler.Handlers;
 using TreePassBot.Models;
 using TreePassBot.Services;
 using TreePassBot.Services.Interfaces;
@@ -53,11 +58,26 @@ internal static class Program
                                    .AddCommandModules(Assembly.GetExecutingAssembly())
                                    .AddSingleton<CommandDispatcher>()
 
+                                    // Factory
+                                   .AddSingleton<HandlerLinkNodeFactory>()
+
                                     // Event Handlers
+                                   .AddMessageModules(Assembly.GetExecutingAssembly())
+                                   .AddSingleton((provider =>
+                                    {
+                                        var logger = provider.GetRequiredService<ILogger<MessageHandlerDispatcher>>();
+                                        var dispatcher = new MessageHandlerDispatcher(logger, provider);
+
+                                        dispatcher.UseHandler<AdminCommandMessageHandler>()
+                                                  .UseHandler<AuditCommandMessageHandler>();
+
+                                        return dispatcher;
+                                    }))
                                    .AddSingleton<GroupMessageEventHandler>()
                                    .AddSingleton<GroupRequestEventHandler>()
                                    .AddSingleton<GroupMemberEventHandler>()
                                    .AddSingleton<PrivateMessageEventHandler>()
+                                   .AddSingleton<CatchUnhandledException>()
 
                                     // Utils
                                    .AddSingleton<PasscodeGeneratorUtil>()

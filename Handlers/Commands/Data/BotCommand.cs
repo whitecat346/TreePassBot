@@ -1,4 +1,4 @@
-namespace TreePassBot.Handlers.AdminCommands.Data;
+namespace TreePassBot.Handlers.Commands.Data;
 
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
 public sealed class BotCommand(string name) : Attribute

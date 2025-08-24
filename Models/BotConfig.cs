@@ -7,6 +7,9 @@ public class BotConfig
     [JsonPropertyName("BotQqId")]
     public ulong BotQqId { get; init; }
 
+    [JsonPropertyName("OwnerId")]
+    public ulong OwnerId { get; init; }
+
     [JsonPropertyName("AuditGroupId")]
     public ulong AuditGroupId { get; init; }
 
