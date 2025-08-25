@@ -13,4 +13,8 @@ public interface IMessageService
     Task<GroupMemberInfo[]?> GetGroupMemberList(ulong groupId);
 
     Task KickGroupMemberAsync(ulong groupId, ulong userId);
+
+    Task DeleteMessageAsync(long messageId);
+
+    Task<ForwardMessageInfo?> GetForwardMessageAsync(string forwardId);
 }

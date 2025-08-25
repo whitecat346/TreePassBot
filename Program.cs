@@ -68,7 +68,8 @@ internal static class Program
                                         var logger = provider.GetRequiredService<ILogger<MessageHandlerDispatcher>>();
                                         var dispatcher = new MessageHandlerDispatcher(logger, provider);
 
-                                        dispatcher.UseHandler<AdminCommandMessageHandler>()
+                                        dispatcher.UseHandler<UriBlockerMessageHandler>()
+                                                  .UseHandler<AdminCommandMessageHandler>()
                                                   .UseHandler<AuditCommandMessageHandler>();
 
                                         return dispatcher;

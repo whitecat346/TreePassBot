@@ -18,7 +18,9 @@ public class MessageHandlerDispatcher
         _logger = logger;
         _serviceProvider = serviceProvider;
 
-        _ = UseHandler<EndPointMessageHandler>();
+#if DEBUG
+        _ = UseHandler<EndpointMessageHandler>();
+#endif
     }
 
     // ReSharper disable once MemberCanBePrivate.Global

@@ -1,3 +1,4 @@
+using Makabaka.API;
 using Makabaka.Exceptions;
 using Makabaka.Models;
 using Microsoft.Extensions.Logging;
@@ -56,5 +57,28 @@ public class MessageService(ILogger<MessageService> logger) : IMessageService
         var response = await QqBotService.MakabakaApp.BotContext.KickGroupMemberAsync(groupId, userId)
                                          .ConfigureAwait(false);
         response.EnsureSuccess();
+    }
+
+    /// <inheritdoc />
+    public async Task DeleteMessageAsync(long messageId)
+    {
+        logger.LogInformation("Try to delete message: {Id}", messageId);
+        _ = await QqBotService.MakabakaApp.BotContext.RevokeMessageAsync(messageId);
+    }
+
+    /// <inheritdoc />
+    public async Task<ForwardMessageInfo?> GetForwardMessageAsync(string forwardId)
+    {
+        logger.LogInformation("Try to get forward message: {Id}", forwardId);
+        var response = await QqBotService.MakabakaApp.BotContext.GetForwardMessageAsync(forwardId);
+        try
+        {
+            var result = response.Result;
+            return result;
+        }
+        catch (APIResponseDataNullException)
+        {
+            return null;
+        }
     }
 }

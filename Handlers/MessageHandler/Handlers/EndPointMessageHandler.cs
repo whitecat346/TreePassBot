@@ -4,7 +4,7 @@ using IMessageHandler = TreePassBot.Handlers.MessageHandler.Interfaces.IMessageH
 
 namespace TreePassBot.Handlers.MessageHandler.Handlers;
 
-public class EndPointMessageHandler(ILogger<EndPointMessageHandler> logger) : IMessageHandler
+public class EndpointMessageHandler(ILogger<EndpointMessageHandler> logger) : IMessageHandler
 {
     /// <inheritdoc />
     public Task InvokeAsync(GroupMessageEventArgs e, HandlerLinkNode? next)
