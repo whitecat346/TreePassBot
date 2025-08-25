@@ -16,19 +16,26 @@ public partial class UriBlockerMessageHandler(
     [GeneratedRegex(@"(?:https?://)?(?:[a-zA-Z0-9_-]+\.)+[a-zA-Z]{2,6}(?::[0-9]+)?(?:/[^\s]*)?")]
     private static partial Regex UriMatcherRegex();
 
+    private readonly Regex _uriMatcher = UriMatcherRegex();
+
     /// <inheritdoc />
     public async Task InvokeAsync(GroupMessageEventArgs e, HandlerLinkNode? next)
     {
+#if !DEBUG
         if (IsAdmin(e.Sender))
         {
             next?.Next(e);
             return;
         }
+#endif
 
-        var regex = UriMatcherRegex();
+
         var msg = await MessageToStringAsync(e.Message).ConfigureAwait(false);
+#if DEBUG
+        logger.LogInformation("Converted message content: {Content}", msg);
+#endif
 
-        if (!regex.IsMatch(msg))
+        if (!_uriMatcher.IsMatch(msg))
         {
             next?.Next(e);
             return;
@@ -58,7 +65,18 @@ public partial class UriBlockerMessageHandler(
             return string.Empty;
         }
 
-        var sb = await SwitchSegmentAsync(response.Message, new StringBuilder());
+        // node to normal segment
+        Message msgContent = [];
+        foreach (var node in response.Message.Select(node => node as NodeSegment))
+        {
+            ArgumentNullException.ThrowIfNull(node);
+
+            var content = node.Data.Content!;
+
+            msgContent.AddRange(content);
+        }
+
+        var sb = await SwitchSegmentAsync(msgContent, new StringBuilder());
 
         return sb.ToString();
     }
@@ -70,14 +88,36 @@ public partial class UriBlockerMessageHandler(
             switch (msg)
             {
                 case TextSegment textSegment:
-                    sb.Append(textSegment.Data.Text);
+
+#if DEBUG
+                    logger.LogInformation("Get text message.");
+#endif
+
+                    sb.AppendLine(textSegment.Data.Text);
                     break;
                 case AtSegment atSegment:
-                    sb.Append($"@{atSegment.Data.Name ?? string.Empty}");
+
+#if DEBUG
+                    logger.LogInformation("Get at message.");
+#endif
+
+                    sb.AppendLine($"{atSegment.Data.Name ?? string.Empty}");
                     break;
                 case ForwardSegment forwardSegment:
-                    sb.Append(await ForwardMessageToStringAsync(forwardSegment.Data.Id).ConfigureAwait(false));
+                    var forwardMsgContent =
+                        await ForwardMessageToStringAsync(forwardSegment.Data.Id).ConfigureAwait(false);
+
+#if DEBUG
+                    logger.LogInformation("Get forward message content:\n {Content}", forwardMsgContent);
+#endif
+
+                    sb.AppendLine(forwardMsgContent);
                     break;
+#if DEBUG
+                default:
+                    logger.LogInformation("Reviced message not handlable.");
+                    break;
+#endif
             }
         }
 
