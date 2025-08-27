@@ -115,13 +115,19 @@ public class CommandDispatcher
             return true;
         }
 
-        _logger.LogInformation("User {ID} try to issue command {Name}.", e.UserId, commandName);
+        if (e.Sender is null)
+        {
+            _logger.LogWarning("Sender is null, command execution skipped.");
+            return true;
+        }
 
-        if (!IsExecutable(e, commandInfo.Roles))
+        if (!IsExecutable(e.Sender, commandInfo.Roles))
         {
             _logger.LogInformation("Un-executable user try to issue command {Name}.", commandName);
             return true;
         }
+
+        _logger.LogInformation("User {ID} try to issue command {Name}.", e.UserId, commandName);
 
         _logger.LogInformation("Execute command {Name} by {UserId}.", commandName, e.UserId);
 
@@ -159,7 +165,7 @@ public class CommandDispatcher
         return true;
     }
 
-    private bool IsExecutable(GroupMessageEventArgs e, UserRoles role)
+    private bool IsExecutable(GroupMessageSenderInfo sender, UserRoles role)
     {
         if (role.HasFlag(UserRoles.None))
         {
@@ -172,17 +178,17 @@ public class CommandDispatcher
 
         if (role.HasFlag(UserRoles.GroupAdmin))
         {
-            isGroupAdmin = e.Sender?.Role is GroupRoleType.Admin or GroupRoleType.Owner;
+            isGroupAdmin = sender.Role is GroupRoleType.Admin or GroupRoleType.Owner;
         }
 
         if (role.HasFlag(UserRoles.BotAdmin))
         {
-            isBotAdmin = _config.AdminQqIds.Contains(e.UserId);
+            isBotAdmin = _config.AdminQqIds.Contains(sender.UserId);
         }
 
         if (role.HasFlag(UserRoles.Auditor))
         {
-            isAuditor = _config.AuditorQqIds.Contains(e.UserId);
+            isAuditor = _config.AuditorQqIds.Contains(sender.UserId);
         }
 
         return isGroupAdmin || isBotAdmin || isAuditor;
