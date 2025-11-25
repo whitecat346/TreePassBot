@@ -1,9 +1,9 @@
-using System.Text;
 using Makabaka.Events;
 using Makabaka.Messages;
 using Makabaka.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Text;
 using TreePassBot.Data;
 using TreePassBot.Data.Entities;
 using TreePassBot.Handlers.Commands.Data;
@@ -18,7 +18,8 @@ public class AdminCommands(
     IUserService userService,
     IMessageService messageService,
     ILogger<AdminCommands> logger,
-    IOptions<BotConfig> config)
+    IOptions<BotConfig> config,
+    IAuditService auditService)
 {
     [BotCommand("check", Description = "查询用户状态", Usage = ".check [QQ号]")]
     [RequiredPremission(UserRoles.Auditor | UserRoles.BotAdmin | UserRoles.GroupAdmin)]
@@ -97,21 +98,8 @@ public class AdminCommands(
             return false;
         }
 
-        await userService.DeleteUserAsync(qqToReset).ConfigureAwait(false);
-        var success = await userService.AddPendingUserAsync(qqToReset).ConfigureAwait(false);
-
-        if (success)
-        {
-            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"成功将用户 {qqToReset} 重置为待审核状态。")])
-                   .ConfigureAwait(false);
-        }
-        else
-        {
-            await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment($"无法重置用户 {qqToReset}，可能已存在或发生错误。")])
-                   .ConfigureAwait(false);
-        }
-
-        return true;
+        // 使用专门的审核服务来重置用户，确保状态正确重置
+        return await auditService.ResetUserAsync(qqToReset, e.UserId, e.GroupId).ConfigureAwait(false);
     }
 
     [BotCommand("audit-help", Description = "查看审核相关命令", Usage = ".audit-help")]
@@ -169,14 +157,14 @@ public class AdminCommands(
         var userList = await messageService.GetGroupMemberList(targetGroupId).ConfigureAwait(false);
         if (userList == null)
         {
-            logger.LogWarning("Failed to get group member list.");
+            logger.LogWarning("Failed to get group member list");
             await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("无法获取用户列表，可能是该群组没有成员或发生了错误。")])
                    .ConfigureAwait(false);
             return false;
         }
 
         var botConfig = config.Value;
-        HashSet<ulong> adminQqIds = [..botConfig.AdminQqIds, ..botConfig.AuditorQqIds, botConfig.BotQqId];
+        HashSet<ulong> adminQqIds = [.. botConfig.AdminQqIds, .. botConfig.AuditorQqIds, botConfig.BotQqId];
 
         var withOutAdmin = userList
                           .Where(user => user.Role is GroupRoleType.Member)
@@ -220,7 +208,7 @@ public class AdminCommands(
                 return members;
             }
 
-            logger.LogWarning("Failed to get group {GroupId} member list info.", groupId);
+            logger.LogWarning("Failed to get group {GroupId} member list info", groupId);
             return Enumerable.Empty<GroupMemberInfo>();
         }).ToList();
 
@@ -232,7 +220,7 @@ public class AdminCommands(
 
         if (mainUsers.Count == 0)
         {
-            logger.LogWarning("Failed to get group group member list.");
+            logger.LogWarning("Failed to get group group member list");
             await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("获取用户列表时失败。")]).ConfigureAwait(false);
             return false;
         }
@@ -240,13 +228,13 @@ public class AdminCommands(
         var auditUsers = await messageService.GetGroupMemberList(botConfig.AuditGroupId).ConfigureAwait(false);
         if (auditUsers == null)
         {
-            logger.LogWarning("Failed to get audit group member list.");
+            logger.LogWarning("Failed to get audit group member list");
             await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("无法获取审核群组的用户列表。")]).ConfigureAwait(false);
             return false;
         }
 
 
-        HashSet<ulong> adminQqIds = [..botConfig.AdminQqIds, ..botConfig.AuditorQqIds, botConfig.BotQqId];
+        HashSet<ulong> adminQqIds = [.. botConfig.AdminQqIds, .. botConfig.AuditorQqIds, botConfig.BotQqId];
 
         var auditGroupUserDict = auditUsers
                                 .Where(user => user.Role is GroupRoleType.Member)
@@ -299,12 +287,12 @@ public class AdminCommands(
         var existUsersResponse = await messageService.GetGroupMemberList(botConfig.AuditGroupId);
         if (existUsersResponse == null)
         {
-            logger.LogWarning("Failed to get audit group member list.");
+            logger.LogWarning("Failed to get audit group member list");
             await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("无法获取审核群组的用户列表。")]).ConfigureAwait(false);
             return false;
         }
 
-        HashSet<ulong> adminQqIds = [..botConfig.AdminQqIds, ..botConfig.AuditorQqIds, botConfig.BotQqId];
+        HashSet<ulong> adminQqIds = [.. botConfig.AdminQqIds, .. botConfig.AuditorQqIds, botConfig.BotQqId];
 
         var existUserIds = existUsersResponse
                           .Where(user => user.Role is GroupRoleType.Member)

@@ -1,9 +1,9 @@
-using System.Text;
-using System.Text.RegularExpressions;
 using Makabaka.Events;
 using Makabaka.Messages;
 using Makabaka.Models;
 using Microsoft.Extensions.Logging;
+using System.Text;
+using System.Text.RegularExpressions;
 using TreePassBot.Services.Interfaces;
 using IMessageHandler = TreePassBot.Handlers.MessageHandler.Interfaces.IMessageHandler;
 
@@ -47,7 +47,7 @@ public partial class UriBlockerMessageHandler(
             new TextSegment("由于管理员设置，该群禁止发送链接，消息已被删除。")
         ]).ConfigureAwait(false);
 
-        logger.LogInformation("Delete message {Id} from {GroupId}.", e.MessageId, e.GroupId);
+        logger.LogInformation("Delete message {Id} from {GroupId}", e.MessageId, e.GroupId);
     }
 
     private async Task<string> MessageToStringAsync(Message messages)

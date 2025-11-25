@@ -1,4 +1,3 @@
-using Makabaka.API;
 using Makabaka.Exceptions;
 using Makabaka.Models;
 using Microsoft.Extensions.Logging;
@@ -22,7 +21,7 @@ public class MessageService(ILogger<MessageService> logger) : IMessageService
 
     public async Task<GroupMemberInfo?> GetGroupMemberInfo(ulong groupId, ulong userId)
     {
-        logger.LogInformation("Try to get group {GroupId} member {MemberId} info.", groupId, userId);
+        logger.LogInformation("Try to get group {GroupId} member {MemberId} info", groupId, userId);
         var response = await QqBotService.MakabakaApp.BotContext.GetGroupMemberInfoAsync(groupId, userId)
                                          .ConfigureAwait(false);
         try
@@ -38,7 +37,7 @@ public class MessageService(ILogger<MessageService> logger) : IMessageService
 
     public async Task<GroupMemberInfo[]?> GetGroupMemberList(ulong groupId)
     {
-        logger.LogInformation("Try to get group {GroupId} member list.", groupId);
+        logger.LogInformation("Try to get group {GroupId} member list", groupId);
         var response = await QqBotService.MakabakaApp.BotContext.GetGroupMemberListAsync(groupId).ConfigureAwait(false);
         try
         {
@@ -53,7 +52,7 @@ public class MessageService(ILogger<MessageService> logger) : IMessageService
 
     public async Task KickGroupMemberAsync(ulong groupId, ulong userId)
     {
-        logger.LogInformation("Try to kick member {UserId} from group {GroupId}.", userId, groupId);
+        logger.LogInformation("Try to kick member {UserId} from group {GroupId}", userId, groupId);
         var response = await QqBotService.MakabakaApp.BotContext.KickGroupMemberAsync(groupId, userId)
                                          .ConfigureAwait(false);
         response.EnsureSuccess();

@@ -1,10 +1,9 @@
-using System.Reflection;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using System.Reflection;
 using TreePassBot.Data;
 using TreePassBot.Exceptions;
 using TreePassBot.Handlers;
@@ -45,23 +44,23 @@ internal static class Program
                            .ConfigureServices(((hostContext, services) =>
                             {
                                 services
-                                    // Data Store
+                                   // Data Store
                                    .Configure<BotConfig>(hostContext.Configuration.GetSection("BotConfig"))
                                    .AddSingleton<JsonDataStore>()
 
-                                    // Services
+                                   // Services
                                    .AddScoped<IUserService, UserService>()
                                    .AddScoped<IAuditService, AuditService>()
                                    .AddScoped<IMessageService, MessageService>()
 
-                                    // Command Dispatcher
+                                   // Command Dispatcher
                                    .AddCommandModules(Assembly.GetExecutingAssembly())
                                    .AddSingleton<CommandDispatcher>()
 
-                                    // Factory
+                                   // Factory
                                    .AddSingleton<HandlerLinkNodeFactory>()
 
-                                    // Event Handlers
+                                   // Event Handlers
                                    .AddMessageModules(Assembly.GetExecutingAssembly())
                                    .AddSingleton((provider =>
                                     {
@@ -80,22 +79,22 @@ internal static class Program
                                    .AddSingleton<PrivateMessageEventHandler>()
                                    .AddSingleton<CatchUnhandledException>()
 
-                                    // Utils
+                                   // Utils
                                    .AddSingleton<PasscodeGeneratorUtil>()
                                    .AddSingleton<ArgumentsSpiliterUtil>()
 
-                                    // Host
+                                   // Host
                                    .AddHostedService<QqBotService>();
                             }))
                            .Build();
 
-            Log.Information("QQBot host started successfully.");
+            Log.Information("QQBot host started successfully");
 
             return host;
         }
         catch (Exception ex)
         {
-            Log.Fatal(ex, "Host rerminated unexpectedly.");
+            Log.Fatal(ex, "Host rerminated unexpectedly");
             throw;
         }
     }

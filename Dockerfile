@@ -28,7 +28,7 @@ RUN dotnet build "./TreePassBot.csproj" -c $BUILD_CONFIGURATION -o /app/build
 # 此阶段用于发布要复制到最终阶段的服务项目
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./TreePassBot.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=true
+RUN dotnet publish "./TreePassBot.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=true --self-contained true -r linux-x64
 
 # 从 VS 启动以支持常规模式(不使用调试配置时为默认值)下的调试时，此阶段用作最终阶段的基础
 FROM base AS aotdebug

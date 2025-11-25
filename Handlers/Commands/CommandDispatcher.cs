@@ -1,10 +1,10 @@
-using System.Reflection;
 using Makabaka.Events;
 using Makabaka.Messages;
 using Makabaka.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Reflection;
 using TreePassBot.Handlers.Commands.Data;
 using TreePassBot.Handlers.Commands.Permission;
 using TreePassBot.Models;
@@ -70,7 +70,7 @@ public class CommandDispatcher
 
                 if (!_commands.TryAdd(attr.Name, commandInfo))
                 {
-                    _logger.LogWarning("Command {Name} duplicated, skipped.", attr.Name);
+                    _logger.LogWarning("Command {Name} duplicated, skipped", attr.Name);
 
 
                     continue;
@@ -80,13 +80,13 @@ public class CommandDispatcher
                 {
                     if (!_commands.TryAdd(alias.ToLowerInvariant(), commandInfo))
                     {
-                        _logger.LogWarning("Command alias {Name} duplicated, skipped.", alias);
+                        _logger.LogWarning("Command alias {Name} duplicated, skipped", alias);
                     }
                 }
             }
         }
 
-        _logger.LogInformation("Successed to register {Count} commands.", _commands.Count);
+        _logger.LogInformation("Successed to register {Count} commands", _commands.Count);
     }
 
     public async Task<bool> ExecteAsync(GroupMessageEventArgs e)
@@ -110,26 +110,26 @@ public class CommandDispatcher
         {
             await e.ReplyAsync([new AtSegment(e.UserId), new TextSegment("未知命令："), new TextSegment(commandName)])
                    .ConfigureAwait(false);
-            _logger.LogWarning("Command {Command} not found.", commandName);
+            _logger.LogWarning("Command {Command} not found", commandName);
 
             return true;
         }
 
         if (e.Sender is null)
         {
-            _logger.LogWarning("Sender is null, command execution skipped.");
+            _logger.LogWarning("Sender is null, command execution skipped");
             return true;
         }
 
         if (!IsExecutable(e.Sender, commandInfo.Roles))
         {
-            _logger.LogInformation("Un-executable user try to issue command {Name}.", commandName);
+            _logger.LogInformation("Un-executable user try to issue command {Name}", commandName);
             return true;
         }
 
-        _logger.LogInformation("User {ID} try to issue command {Name}.", e.UserId, commandName);
+        _logger.LogInformation("User {ID} try to issue command {Name}", e.UserId, commandName);
 
-        _logger.LogInformation("Execute command {Name} by {UserId}.", commandName, e.UserId);
+        _logger.LogInformation("Execute command {Name} by {UserId}", commandName, e.UserId);
 
         using var scoop = _serviceProvider.CreateScope();
         try

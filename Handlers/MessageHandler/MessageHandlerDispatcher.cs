@@ -1,8 +1,7 @@
-using System.Reflection;
 using Makabaka.Events;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using TreePassBot.Handlers.MessageHandler.Handlers;
+using System.Reflection;
 using IMessageHandler = TreePassBot.Handlers.MessageHandler.Interfaces.IMessageHandler;
 
 namespace TreePassBot.Handlers.MessageHandler;
@@ -39,7 +38,7 @@ public class MessageHandlerDispatcher
 
         if (!typeof(IMessageHandler).IsAssignableFrom(handlerType))
         {
-            _logger.LogWarning("Class {Name} not implement interface 'IMessageHandler', skipped.", handlerType.Name);
+            _logger.LogWarning("Class {Name} not implement interface 'IMessageHandler', skipped", handlerType.Name);
             return this;
         }
 
@@ -59,7 +58,7 @@ public class MessageHandlerDispatcher
             if (paramaters[0].ParameterType != typeof(GroupMessageEventArgs) &&
                 paramaters[1].ParameterType != typeof(HandlerLinkNode))
             {
-                _logger.LogWarning("Finded 'InvokeAsync' not matched rules because of paramaters.");
+                _logger.LogWarning("Finded 'InvokeAsync' not matched rules because of paramaters");
                 continue;
             }
 

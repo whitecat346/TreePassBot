@@ -15,7 +15,7 @@ public class UserService(
     {
         if (dataStore.UserExists(qqId))
         {
-            logger.LogInformation("User {QqId} already in pending list, skipping.", qqId);
+            logger.LogInformation("User {QqId} already in pending list, skipping", qqId);
             return Task.FromResult(true); // 认为是成功，因为目标状态（用户在列表里）已达成
         }
 
@@ -28,14 +28,14 @@ public class UserService(
         };
 
         dataStore.AddUser(newUser);
-        logger.LogInformation("User {QqId} added to pending list.", qqId);
+        logger.LogInformation("User {QqId} added to pending list", qqId);
         return Task.FromResult(true);
     }
 
     /// <inheritdoc />
     public Task<UserInfo?> GetUserInfoByIdAsync(ulong qqId)
     {
-        logger.LogInformation("Try to get user {QqId}.", qqId);
+        logger.LogInformation("Try to get user {QqId}", qqId);
         return Task.FromResult(dataStore.GetUserByQqId(qqId));
     }
 
@@ -61,7 +61,7 @@ public class UserService(
 
         dataStore.UpdateUser(user);
 
-        logger.LogInformation("Update user {QqId} status to {State}.", qqId, status);
+        logger.LogInformation("Update user {QqId} status to {State}", qqId, status);
 
         updatedUser = user;
         return Task.FromResult(true);
@@ -77,7 +77,28 @@ public class UserService(
             throw new UserNotFoundException(qqId);
         }
 
-        logger.LogInformation("Validate user {QqId}.", qqId);
+        logger.LogInformation("Validate user {QqId}", qqId);
+
+        // 检查用户状态是否允许验证
+        if (user.Status != AuditStatus.Approved)
+        {
+            return Task.FromResult((false, false));
+        }
+
+        // 检查验证码是否为空
+        if (string.IsNullOrEmpty(user.Passcode))
+        {
+            logger.LogWarning("User {QqId} does not have a passcode", qqId);
+            return Task.FromResult((false, false));
+        }
+
+        // 检查输入验证码是否为空
+        if (string.IsNullOrEmpty(passcode))
+        {
+            logger.LogWarning("User {QqId} submitted empty passcode", qqId);
+            return Task.FromResult((false, false));
+        }
+
         var rightPasscode = user.Passcode.Equals(passcode, StringComparison.OrdinalIgnoreCase);
         var expriedPassscode = user.Status == AuditStatus.Expired;
 
@@ -88,7 +109,7 @@ public class UserService(
     public Task DeleteUserAsync(ulong qqId)
     {
         dataStore.DeleteUser(qqId);
-        logger.LogInformation("Delete user {QqId} from audit list.", qqId);
+        logger.LogInformation("Delete user {QqId} from audit list", qqId);
         return Task.CompletedTask;
     }
 
@@ -96,7 +117,7 @@ public class UserService(
     public Task AddToBlackList(ulong qqId)
     {
         dataStore.AddToBlackList(qqId);
-        logger.LogInformation("Add user {QqId} to black list.", qqId);
+        logger.LogInformation("Add user {QqId} to black list", qqId);
         return Task.CompletedTask;
     }
 
@@ -104,7 +125,7 @@ public class UserService(
     public Task<bool> IsInBlackList(ulong qqId)
     {
         var isBlack = dataStore.IsInBlackList(qqId);
-        logger.LogInformation("Check user {QqId} whether in black list.", qqId);
+        logger.LogInformation("Check user {QqId} whether in black list", qqId);
         return Task.FromResult(isBlack);
     }
 
@@ -112,7 +133,7 @@ public class UserService(
     public Task RemoveFromBlackList(ulong qqId)
     {
         dataStore.RemoveFromBlackList(qqId);
-        logger.LogInformation("Remove user {QqId} from black list.", qqId);
+        logger.LogInformation("Remove user {QqId} from black list", qqId);
         return Task.CompletedTask;
     }
 }

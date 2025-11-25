@@ -18,7 +18,7 @@ public class AuditService(
         var user = await userService.GetUserInfoByIdAsync(targetQqId).ConfigureAwait(false);
         if (user is null)
         {
-            logger.LogError("Targe user: {TargetQqId} not contains in pending list.", targetQqId);
+            logger.LogError("Targe user: {TargetQqId} not contains in pending list", targetQqId);
 
             await messageService.SendGroupMessageAsync(groupId,
             [
@@ -31,7 +31,7 @@ public class AuditService(
 
         if (user.Status is AuditStatus.Approved)
         {
-            logger.LogError("Targe user: {TargetQqId} has been processed.", targetQqId);
+            logger.LogError("Targe user: {TargetQqId} has been processed", targetQqId);
 
             await messageService.SendGroupMessageAsync(groupId, [
                 new AtSegment(operatorQqId),
@@ -41,7 +41,7 @@ public class AuditService(
             return false;
         }
 
-        var passcode = await generator.GenerateUniquePasscodeAsync();
+        var passcode = await generator.GenerateUniquePasscodeAsync().ConfigureAwait(false);
 
         // update data
         var success =
@@ -50,7 +50,7 @@ public class AuditService(
 
         if (success)
         {
-            logger.LogInformation("User {TargetQqId} has been approved by operator {OperatorQqId}.", targetQqId,
+            logger.LogInformation("User {TargetQqId} has been approved by operator {OperatorQqId}", targetQqId,
                                   operatorQqId);
 
             await messageService.SendGroupMessageAsync(groupId,
@@ -75,20 +75,21 @@ public class AuditService(
     /// <inheritdoc />
     public async Task<bool> ProcessDenialAsync(ulong targetId, ulong operatorQqId, ulong groupId)
     {
-        var user = await userService.GetUserInfoByIdAsync(targetId);
+        var user = await userService.GetUserInfoByIdAsync(targetId).ConfigureAwait(false);
         if (user is null)
         {
-            logger.LogError("Targe user: {TargetQqId} not contains in pending list.", targetId);
+            logger.LogError("Targe user: {TargetQqId} not contains in pending list", targetId);
 
             await messageService.SendGroupMessageAsync(groupId,
-                                                       [new AtSegment(operatorQqId), new TextSegment("目标QQ号未找到！")]);
+                                                       [new AtSegment(operatorQqId), new TextSegment("目标QQ号未找到！")])
+                                .ConfigureAwait(false);
 
             return false;
         }
 
         if (user.Status is AuditStatus.Approved or AuditStatus.Expired)
         {
-            logger.LogError("Targe user: {TargetQqId} has been processed.", targetId);
+            logger.LogError("Targe user: {TargetQqId} has been processed", targetId);
 
             await messageService.SendGroupMessageAsync(groupId,
             [
@@ -133,7 +134,7 @@ public class AuditService(
             // for ensure user is deleted from data store.
             await userService.DeleteUserAsync(targetId).ConfigureAwait(false);
 
-            logger.LogInformation("User {TargetQqId} has been kicked and deleted from data store.", targetId);
+            logger.LogInformation("User {TargetQqId} has been kicked and deleted from data store", targetId);
 
             return true;
         }
@@ -147,9 +148,53 @@ public class AuditService(
             new TextSegment(lastChance)
         ]).ConfigureAwait(false);
 
-        logger.LogInformation("User {TargetQqId} has been denied approval by operator {OperatorQqId}.", targetId,
+        logger.LogInformation("User {TargetQqId} has been denied approval by operator {OperatorQqId}", targetId,
                               operatorQqId);
 
         return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> ResetUserAsync(ulong targetId, ulong operatorQqId, ulong groupId)
+    {
+        var user = await userService.GetUserInfoByIdAsync(targetId).ConfigureAwait(false);
+        if (user is null)
+        {
+            logger.LogError("Target user: {TargetQqId} not found", targetId);
+
+            await messageService.SendGroupMessageAsync(groupId,
+            [
+                new AtSegment(operatorQqId),
+                new TextSegment("目标QQ号未找到！")
+            ]).ConfigureAwait(false);
+
+            return false;
+        }
+
+        // 删除用户并重新添加为待审核状态
+        await userService.DeleteUserAsync(targetId).ConfigureAwait(false);
+        var success = await userService.AddPendingUserAsync(targetId).ConfigureAwait(false);
+
+        if (success)
+        {
+            logger.LogInformation("User {TargetQqId} has been reset by operator {OperatorQqId}", targetId,
+                                  operatorQqId);
+
+            await messageService.SendGroupMessageAsync(groupId,
+            [
+                new AtSegment(operatorQqId),
+                new TextSegment($"用户 {targetId} 已被重置为待审核状态。")
+            ]).ConfigureAwait(false);
+        }
+        else
+        {
+            await messageService.SendGroupMessageAsync(groupId,
+            [
+                new AtSegment(operatorQqId),
+                new TextSegment($"重置用户 {targetId} 失败。")
+            ]).ConfigureAwait(false);
+        }
+
+        return success;
     }
 }

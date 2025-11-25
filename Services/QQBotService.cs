@@ -11,7 +11,7 @@ public class QqBotService : IHostedService
 {
     public static readonly MakabakaApp MakabakaApp = new MakabakaAppBuilder(Program.InArgs).Build();
 
-    private static async Task Init(CancellationToken ct)
+    private static Task Init(CancellationToken ct)
     {
         MakabakaApp.BotContext.OnGroupAddRequest += OnGroupAddRequestHelper;
         MakabakaApp.BotContext.OnGroupMessage += OnGroupMessageHelper;
@@ -19,7 +19,7 @@ public class QqBotService : IHostedService
         MakabakaApp.BotContext.OnGroupMemberDecrease += OnGroupMemberDecreaseHelper;
         MakabakaApp.BotContext.OnPrivateMessage += OnPrivateMessageHelper;
 
-        await MakabakaApp.StartAsync(ct);
+        return MakabakaApp.StartAsync(ct);
     }
 
     #region Helper Method
@@ -59,20 +59,20 @@ public class QqBotService : IHostedService
 
     private static Task OnGroupMessageHelper(object sender, GroupMessageEventArgs e)
     {
-        return _groupMessageEventHandler.HandleGroupMessage(e);
+        return _groupMessageEventHandler.HandleGroupMessageAsync(e);
     }
 
     #endregion
 
     /// <inheritdoc />
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
-        await Init(cancellationToken).ConfigureAwait(false);
+        return Init(cancellationToken);
     }
 
     /// <inheritdoc />
-    public async Task StopAsync(CancellationToken cancellationToken)
+    public Task StopAsync(CancellationToken cancellationToken)
     {
-        await MakabakaApp.StopAsync(cancellationToken).ConfigureAwait(false);
+        return MakabakaApp.StopAsync(cancellationToken);
     }
 }

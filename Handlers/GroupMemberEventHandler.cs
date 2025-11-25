@@ -23,7 +23,7 @@ public class GroupMemberEventHandler(
             return;
         }
 
-        logger.LogInformation("New member {UserId} joined group {GroupId}.", e.UserId, e.GroupId);
+        logger.LogInformation("New member {UserId} joined group {GroupId}", e.UserId, e.GroupId);
         await userService.AddPendingUserAsync(e.UserId).ConfigureAwait(false);
 
         await messageService.SendGroupMessageAsync(e.GroupId,

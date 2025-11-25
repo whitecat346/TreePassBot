@@ -8,11 +8,11 @@ public class GroupMessageEventHandler(
     MessageHandlerDispatcher dispatcher,
     ILogger<GroupMessageEventHandler> logger)
 {
-    public async Task HandleGroupMessage(GroupMessageEventArgs e)
+    public Task HandleGroupMessageAsync(GroupMessageEventArgs e)
     {
 #if DEBUG
         logger.LogInformation("Handler Message: {Message}", e.Message.ToString());
 #endif
-        await dispatcher.HandleMessage(e);
+        return dispatcher.HandleMessage(e);
     }
 }
